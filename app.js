@@ -7,7 +7,7 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const IS_MOBILE=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)||innerWidth<820;
 const ASPECTS={'16:9':[16,9],'9:16':[9,16],'1:1':[1,1],'4:5':[4,5],'4:3':[4,3]};
 const FONT='Cairo,Tajawal,"Noto Sans Arabic",Arial,sans-serif';
-const PRESETS={none:{n:'بدون'},bw:{n:'أبيض وأسود',g:100},sepia:{n:'سيبيا',sp:85},vivid:{n:'حيوي',s:150,c:115},cool:{n:'بارد',h:-20,s:115,b:102},warm:{n:'دافئ',h:14,s:115,sp:15},vintage:{n:'قديم',sp:45,c:90,b:105,s:80},fade:{n:'باهت',c:80,b:115,s:75},drama:{n:'درامي',c:145,s:110,b:88},noir:{n:'نوار',g:100,c:150,b:90},neon:{n:'نيون',h:-40,s:190,c:120},invert:{n:'معكوس',inv:100}};
+const PRESETS={none:{n:'بدون'},bw:{n:'أبيض وأسود',g:100},sepia:{n:'سيبيا',sp:85},vivid:{n:'حيوي',s:150,c:115},cool:{n:'بارد',h:-20,s:115,b:102},warm:{n:'دافئ',h:14,s:115,sp:15},vintage:{n:'قديم',sp:45,c:90,b:105,s:80},fade:{n:'باهت',c:80,b:115,s:75},drama:{n:'درامي',c:145,s:110,b:88},noir:{n:'نوار',g:100,c:150,b:90},neon:{n:'نيون',h:-40,s:190,c:120},invert:{n:'معكوس',inv:100},teal:{n:'تيل وبرتقاني',h:-8,s:135,c:115,tc:'#00a3b8',ta:.35},pastel:{n:'باستيل',s:70,b:112,c:85},cyber:{n:'سايبر',h:55,s:175,c:125,tc:'#ff00aa',ta:.3},golden:{n:'ساعة ذهبية',h:18,s:130,sp:25,b:106,tc:'#ffb347',ta:.35},moody:{n:'كئيب',c:130,s:75,b:84,tc:'#2b4a6b',ta:.4},hdr:{n:'HDR',c:140,s:145,b:104},chrome:{n:'كروم',g:35,c:145,b:106},dream:{n:'حلم',b:115,c:88,s:125,tc:'#ffd1f0',ta:.3},matrix:{n:'ماتريكس',h:60,s:140,c:130,b:92,tc:'#00ff55',ta:.35}};
 const S={aspect:'16:9',clips:[],texts:[],subs:[],audios:[],overlays:[],subStyle:{size:5.4,color:'#ffffff',bg:true,pos:88,burn:true,kar:false,khc:'#ffe14d'},playhead:0,sel:null,tab:'media',pps:50};
 const assets={};
 const SIL0=0,SIL={th:-38,min:.5},BEAT={n:2,mus:''},CARD={t:'عنوان الفيديو',s:'اكتب العنوان الفرعي هنا',st:0,d:3};let keyPick=false;
@@ -202,6 +202,7 @@ function drawClipLayer(ctx,c,a,w,h,t){
     ctx.clip()}
   ctx.translate(w/2+(c.px||0)/100*w+shx,h/2+(c.py||0)/100*h+shy);ctx.rotate(rot);ctx.scale(fl,1);
   ctx.drawImage(src,csx,csy,csw,csh,-csw*sc/2,-csh*sc/2,csw*sc,csh*sc);ctx.restore();ctx.filter='none';
+  {const pp=PRESETS[c.preset];if(pp&&pp.tc){ctx.save();ctx.globalCompositeOperation='soft-light';ctx.globalAlpha=pp.ta||.3;ctx.fillStyle=pp.tc;ctx.fillRect(0,0,w,h);ctx.restore()}}
   if(c.temp||c.tint){ctx.save();ctx.globalCompositeOperation='soft-light';if(c.temp){ctx.globalAlpha=Math.min(1,Math.abs(c.temp)/100*.9);ctx.fillStyle=c.temp>0?'#ff9a1f':'#1f8bff';ctx.fillRect(0,0,w,h)}if(c.tint){ctx.globalAlpha=Math.min(1,Math.abs(c.tint)/100*.8);ctx.fillStyle=c.tint>0?'#ff2fb4':'#22e07a';ctx.fillRect(0,0,w,h)}ctx.restore()}
   postFx(ctx,c,w,h,lt);
   if(c.vig){const g=ctx.createRadialGradient(w/2,h/2,Math.min(w,h)*.3,w/2,h/2,Math.max(w,h)*.75);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,.75)');ctx.fillStyle=g;ctx.fillRect(0,0,w,h)}
@@ -585,7 +586,7 @@ function drawPresetThumbs(){
     const fake={preset:c.dataset.pp,b:100,c:100,s:100,h:0,bl:0};
     const paint=img=>{x.filter='none';if(img)x.drawImage(img,0,0,96,60);else{const g=x.createLinearGradient(0,0,96,60);g.addColorStop(0,'#ff7a59');g.addColorStop(.5,'#ffd25a');g.addColorStop(1,'#2f7bff');x.fillStyle=g;x.fillRect(0,0,96,60)}};
     x.fillStyle='#222';x.fillRect(0,0,96,60);x.filter=filterStr(fake,1280);
-    if(a&&a.thumb){const im=new Image();im.onload=()=>{x.filter=filterStr(fake,1280);x.drawImage(im,0,0,96,60);x.filter='none'};im.src=a.thumb}
+    if(a&&a.thumb){const im=new Image();im.onload=()=>{x.filter=filterStr(fake,1280);x.drawImage(im,0,0,96,60);x.filter='none';const pp=PRESETS[fake.preset];if(pp&&pp.tc){x.save();x.globalCompositeOperation='soft-light';x.globalAlpha=pp.ta||.3;x.fillStyle=pp.tc;x.fillRect(0,0,96,60);x.restore()}};im.src=a.thumb}
     else{const g=x.createLinearGradient(0,0,96,60);g.addColorStop(0,'#ff7a59');g.addColorStop(.5,'#ffd25a');g.addColorStop(1,'#2f7bff');x.fillStyle=g;x.fillRect(0,0,96,60);x.filter='none'}
   });
 }
