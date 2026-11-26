@@ -142,23 +142,21 @@ function postFx(ctx,c,w,h,lt){
   }else if(f==='bars'){ctx.save();ctx.fillStyle='#000';const bh=h*.07+h*.08*k;ctx.fillRect(0,0,w,bh);ctx.fillRect(0,h-bh,w,bh);ctx.restore()}
   else if(f==='flash'){const ph=(lt%1.2)/1.2;const a=Math.max(0,1-ph*6)*.7*k+0;if(a>0.01){ctx.save();ctx.fillStyle='rgba(255,255,255,'+a+')';ctx.fillRect(0,0,w,h);ctx.restore()}}
 }
-const keyC=document.createElement('canvas');
+const keyC=document.createElement('canvas'),mC=document.createElement('canvas');
 function keyRGB(hex){return[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)]}
 function drawKeyed(ctx,c,a,w,h,t){
-  keyC.width=w;keyC.height=h;const kx=keyC.getContext('2d',{willReadFrequently:true});kx.clearRect(0,0,w,h);
+  if(keyC.width!==w||keyC.height!==h){keyC.width=w;keyC.height=h}const kx=keyC.getContext('2d');kx.clearRect(0,0,w,h);
   drawClipLayer(kx,Object.assign({},c,{key:false,bgblur:false,fade:0}),a,w,h,t);
-  const im=kx.getImageData(0,0,w,h),d=im.data,[kr,kg,kb]=keyRGB(c.keyc||'#00b140');
-  const kcb=-.169*kr-.331*kg+.5*kb,kcr=.5*kr-.419*kg-.081*kb,tol=(c.keyt==null?35:c.keyt),soft=Math.max(1,c.keys==null?14:c.keys),gk=kg>kr&&kg>kb,bk=kb>kr&&kb>kg;
+  const mw=Math.min(w,640),mh=Math.max(1,Math.round(h*mw/w));if(mC.width!==mw||mC.height!==mh){mC.width=mw;mC.height=mh}const mx=mC.getContext('2d',{willReadFrequently:true});mx.clearRect(0,0,mw,mh);mx.drawImage(keyC,0,0,mw,mh);
+  const im=mx.getImageData(0,0,mw,mh),d=im.data,[kr,kg,kb]=keyRGB(c.keyc||'#00b140');
+  const kcb=-.169*kr-.331*kg+.5*kb,kcr=.5*kr-.419*kg-.081*kb,tol=(c.keyt==null?35:c.keyt),soft=Math.max(1,c.keys==null?14:c.keys),t2=tol*tol,e2=(tol+soft)*(tol+soft);
   for(let i=0;i<d.length;i+=4){
-    if(d[i+3]===0)continue;const r=d[i],g=d[i+1],b=d[i+2];
-    const cb=-.169*r-.331*g+.5*b,cr=.5*r-.419*g-.081*b,dist=Math.hypot(cb-kcb,cr-kcr);
-    let al=dist<=tol?0:dist>=tol+soft?1:(dist-tol)/soft;
-    if(al<1&&al>0||al===1){ /* spill suppression near the key */
-      if(gk&&g>Math.max(r,b)&&dist<tol+soft*3)d[i+1]=Math.max(r,b)+(g-Math.max(r,b))*.25;
-      else if(bk&&b>Math.max(r,g)&&dist<tol+soft*3)d[i+2]=Math.max(r,g)+(b-Math.max(r,g))*.25}
-    d[i+3]=d[i+3]*al;
+    const a0=d[i+3];if(a0===0)continue;const r=d[i],g=d[i+1],bl=d[i+2];
+    const cb=-.169*r-.331*g+.5*bl-kcb,cr=.5*r-.419*g-.081*bl-kcr,q=cb*cb+cr*cr;
+    let al=q<=t2?0:q>=e2?1:(Math.sqrt(q)-tol)/soft;
+    d[i]=d[i+1]=d[i+2]=0;d[i+3]=a0*al;
   }
-  kx.putImageData(im,0,0);
+  mx.putImageData(im,0,0);kx.save();kx.globalCompositeOperation='destination-in';kx.imageSmoothingEnabled=true;kx.imageSmoothingQuality='high';kx.drawImage(mC,0,0,w,h);kx.restore();
   const bga=c.keybg==='image'&&assets[c.keyaid];
   if(bga&&bga.img){const k=Math.max(w/bga.w,h/bga.h);ctx.drawImage(bga.img,(w-bga.w*k)/2,(h-bga.h*k)/2,bga.w*k,bga.h*k)}
   else if(c.keybg==='grad'){const g=ctx.createLinearGradient(0,0,w,h);g.addColorStop(0,'#7c5cff');g.addColorStop(1,'#19d3c5');ctx.fillStyle=g;ctx.fillRect(0,0,w,h)}
@@ -480,7 +478,7 @@ function panelExport(){
   <div class="fld"><label>الإطارات</label><select data-o="exp" data-k="fps">${[24,30,60].map(v=>`<option value="${v}" ${exp.fps===v?'selected':''}>${v} إطار/ث</option>`).join('')}</select></div></div>
   <div class="fld"><label>الصيغة</label><select data-o="exp" data-k="fmt"><option value="auto" ${exp.fmt==='auto'?'selected':''}>تلقائي ${mp4?'(MP4)':'(WebM)'}</option><option value="webm" ${exp.fmt==='webm'?'selected':''}>WebM</option>${mp4?`<option value="mp4" ${exp.fmt==='mp4'?'selected':''}>MP4</option>`:''}</select></div>
   ${chk(S.subStyle,'burn','احرق الترجمة في الفيديو')}
-  <button class="primary" id="expGo" style="width:100%" ${exp.busy?'disabled':''}>${exp.busy?'جاري التصدير...':'ابدأ التصدير'}</button>
+  <button class="primary" id="expGo" style="width:100%" ${exp.busy?'disabled':''}>${exp.busy?'جاري التصدير...':'ابدأ التصدير'}</button>${exp.busy?'<button id="expCancel" style="width:100%;margin-top:8px;border-color:#ff5d6c;color:#ff5d6c">⏹ إلغاء التصدير</button>':''}
   <div class="bar"><i id="expBar" style="width:${exp.pct}%"></i></div><div class="status" id="expSt">التصدير بيتم بسرعة التشغيل العادية (مدة الفيديو = مدة التصدير). سيب الصفحة مفتوحة وقدّامك.</div>
   <div id="expRes"></div>
   <div class="row"><button id="snapBtn">📷 احفظ الإطار الحالي كصورة</button></div>`;
@@ -539,7 +537,7 @@ function wirePanel(B){
   });
   if(S.tab==='subs')$('#asrGo',B).onclick=runASR;
   if(S.tab==='audio')$('#recBtn',B).onclick=toggleRec;
-  if(S.tab==='export'){$('#expGo',B).onclick=runExport;$('#snapBtn',B).onclick=snapshotPNG;showResult()}
+  if(S.tab==='export'){$('#expGo',B).onclick=runExport;const ec=$('#expCancel',B);if(ec)ec.onclick=()=>{exp.cancel=true;if(P.onEnd){const f=P.onEnd;P.onEnd=null;pause();f()}};$('#snapBtn',B).onclick=snapshotPNG;showResult()}
 }
 function drawPresetThumbs(){
   const c0=selObj();const a=c0&&assets[c0.aid];
@@ -642,6 +640,7 @@ async function runExport(){
   mr.start(500);P.exporting=true;
   await new Promise(r=>{P.onEnd=r;play()});
   await new Promise(r=>setTimeout(r,400));mr.stop();await stopped;clearInterval(ui);
+  if(exp.cancel){exp.cancel=false;exp.busy=false;P.exporting=false;monitor.gain.value=1;quality=prevQ;setCanvasSize(quality);seekTo(0);renderPanel();toast('اتلغى التصدير');window.__exportCancelled=true;return}
   const ext=mime.startsWith('video/mp4')?'mp4':'webm',blob=new Blob(chunks,{type:mime.split(';')[0]});
   exp.result={blob,url:URL.createObjectURL(blob),ext,size:blob.size};exp.busy=false;exp.pct=100;P.exporting=false;monitor.gain.value=1;quality=prevQ;setCanvasSize(quality);seekTo(0);
   renderPanel();toast('التصدير خلص ✅');window.__exportDone=true;
@@ -821,5 +820,5 @@ addEventListener('keydown',e=>{
 addEventListener('drop',e=>{if(e.dataTransfer&&e.dataTransfer.files.length)importFiles(e.dataTransfer.files)});
 addEventListener('resize',()=>{renderTL();fitCanvas()});if(window.ResizeObserver)new ResizeObserver(fitCanvas).observe($('#cwrap'));
 if(document.fonts)document.fonts.load('700 20px Cairo').then(()=>{dirty=true}).catch(()=>{});
-window.__S=S;window.__assets=assets;window.__app={play,pause,seekTo,addText,splitAt,runExport,runASR,importFiles,demo};
+window.__S=S;window.__assets=assets;window.__app={drawFrame,play,pause,seekTo,addText,splitAt,runExport,runASR,importFiles,demo};
 setCanvasSize(quality);commit();refreshAll();requestAnimationFrame(tick);checkSaved();
