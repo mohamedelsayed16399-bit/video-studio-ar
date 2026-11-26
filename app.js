@@ -78,7 +78,7 @@ async function makeWave(a){
     for(let i=0;i<N;i++){let m=0;for(let j=0;j<step;j+=Math.max(1,step>>5))m=Math.max(m,Math.abs(d[i*step+j]||0));const h=Math.max(1,m*38);x.fillRect(i,20-h/2,1,h)}
     a.wave=c.toDataURL();renderTL()}catch(e){}
 }
-function defClip(aid){const a=assets[aid];return{id:uid(),aid,in:0,out:a.type==='image'?4:a.dur,speed:1,vol:100,mute:false,preset:'none',b:100,c:100,s:100,h:0,bl:0,vig:false,fit:'contain',bgblur:true,zoom:100,px:0,py:0,kb:0,fade:0,trans:'none',transD:.6,rot:0,flip:false,key:false,keyc:'#00b140',keyt:35,keys:14,keybg:'color',keybgc:'#1b1b3a',keyaid:''}}
+function defClip(aid){const a=assets[aid];return{id:uid(),aid,in:0,out:a.type==='image'?4:a.dur,speed:1,vol:100,mute:false,preset:'none',b:100,c:100,s:100,h:0,bl:0,vig:false,fit:'contain',bgblur:true,zoom:100,px:0,py:0,kb:0,fade:0,trans:'none',transD:.6,rot:0,flip:false,temp:0,tint:0,key:false,keyc:'#00b140',keyt:35,keys:14,keybg:'color',keybgc:'#1b1b3a',keyaid:''}}
 function addClip(aid,at){
   const c=defClip(aid);if(at==null)S.clips.push(c);else S.clips.splice(at,0,c);layout();S.sel={k:'clip',id:c.id};S.tab='fx';commit();refreshAll();dirty=true;seekTo(c._s);
   return c;
@@ -187,6 +187,7 @@ function drawClipLayer(ctx,c,a,w,h,t){
     ctx.clip()}
   ctx.translate(w/2+(c.px||0)/100*w+shx,h/2+(c.py||0)/100*h+shy);ctx.rotate(rot);ctx.scale(fl,1);
   ctx.drawImage(src,-sw0*sc/2,-sh0*sc/2,sw0*sc,sh0*sc);ctx.restore();ctx.filter='none';
+  if(c.temp||c.tint){ctx.save();ctx.globalCompositeOperation='soft-light';if(c.temp){ctx.globalAlpha=Math.min(1,Math.abs(c.temp)/100*.9);ctx.fillStyle=c.temp>0?'#ff9a1f':'#1f8bff';ctx.fillRect(0,0,w,h)}if(c.tint){ctx.globalAlpha=Math.min(1,Math.abs(c.tint)/100*.8);ctx.fillStyle=c.tint>0?'#ff2fb4':'#22e07a';ctx.fillRect(0,0,w,h)}ctx.restore()}
   postFx(ctx,c,w,h,lt);
   if(c.vig){const g=ctx.createRadialGradient(w/2,h/2,Math.min(w,h)*.3,w/2,h/2,Math.max(w,h)*.75);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,.75)');ctx.fillStyle=g;ctx.fillRect(0,0,w,h)}
   ctx.globalAlpha=1;
@@ -434,7 +435,7 @@ function panelFx(){
   if(!c)return`<p class="hint">اختار مقطع من الخط الزمني عشان تعدل المؤثرات والسرعة والصوت.</p>`;
   const a=assets[c.aid]||{};
   let h=`<div class="h4">فلاتر</div><div class="presets">${Object.entries(PRESETS).map(([k,p])=>`<button data-act="preset-fx" data-p="${k}" class="${c.preset===k?'on':''}"><canvas width="96" height="60" data-pp="${k}"></canvas>${p.n}</button>`).join('')}</div>`;
-  h+=`<div class="h4">ضبط الصورة</div>${sld(c,'b','السطوع',30,200,1,'%')}${sld(c,'c','التباين',30,200,1,'%')}${sld(c,'s','التشبع',0,250,1,'%')}${sld(c,'h','تدرج اللون',-180,180,1,'°')}${sld(c,'bl','تمويه',0,20,.5,'px')}${chk(c,'vig','تعتيم الأطراف')}`;
+  h+=`<div class="h4">ضبط الصورة</div>${sld(c,'b','السطوع',30,200,1,'%')}${sld(c,'c','التباين',30,200,1,'%')}${sld(c,'s','التشبع',0,250,1,'%')}${sld(c,'h','تدرج اللون',-180,180,1,'°')}${sld(c,'temp','حرارة اللون (بارد ↔ دافئ)',-100,100,1)}${sld(c,'tint','تينت (أخضر ↔ وردي)',-100,100,1)}${sld(c,'bl','تمويه',0,20,.5,'px')}${chk(c,'vig','تعتيم الأطراف')}`;
   h+=`<div class="h4">⭕ شكل القناع</div><div class="presets" style="grid-template-columns:repeat(3,1fr)">${[['none','بدون'],['circle','دايرة'],['square','مربع مدوّر'],['wide','مستطيل'],['diamond','معيّن'],['heart','قلب']].map(([v,n])=>`<button data-act="mask" data-v="${v}" class="${(c.mask||'none')===v?'on':''}" style="padding:9px 2px;font-size:12px">${n}</button>`).join('')}</div>${c.mask&&c.mask!=='none'?sld(c,'msz','حجم القناع',20,140,1,'%')+sld(c,'mx','إزاحة القناع أفقي',-50,50,1,'%')+sld(c,'my','إزاحة القناع رأسي',-50,50,1,'%'):''}`;
   h+=`<div class="h4">✨ مؤثرات بصرية</div><div class="presets" style="grid-template-columns:repeat(4,1fr)">${Object.entries(FXS).map(([v,n])=>`<button data-act="fx" data-v="${v}" class="${(c.fx||'none')===v?'on':''}" style="padding:9px 2px;font-size:12px">${n}</button>`).join('')}</div>${c.fx&&c.fx!=='none'?sld(c,'fxs','شدة المؤثر',10,100,1,'%'):''}`;
   h+=`<div class="h4">🟩 إزالة الخلفية الخضراء (Chroma Key)</div>${chk(c,'key','فعّل إزالة الخلفية')}<div class="row"><button data-act="pickkey" id="pickKeyBtn">🎯 اختار اللون من الشاشة</button></div>${clr(c,'keyc','لون الخلفية اللي هتتشال')}${sld(c,'keyt','قوة الإزالة',5,90,1)}${sld(c,'keys','نعومة الحواف',1,40,1)}${sel_(c,'keybg','الخلفية البديلة',[['color','لون ثابت'],['grad','تدرج'],['image','صورة من الوسائط']])}${c.keybg==='color'||!c.keybg?clr(c,'keybgc','لون الخلفية البديلة'):''}${c.keybg==='image'?sel_(c,'keyaid','الصورة',[['','— اختار —']].concat(Object.values(assets).filter(x=>x.type==='image').map(x=>[x.id,x.name]))):''}<p class="hint">صوّر قدام ستارة خضراء، فعّل الخيار، واضغط "اختار اللون" وبعدين اضغط على الأخضر في الشاشة.</p>`;
@@ -538,7 +539,7 @@ function wirePanel(B){
     else if(act==='srtin')$('#srtIn').click();
     else if(act==='srtout')exportSRT();
     else if(act==='preset-fx'){const c=selObj();c.preset=b.dataset.p;commit();renderPanel();dirty=true}
-    else if(act==='applyall'){const c=selObj();S.clips.forEach(o=>{['preset','b','c','s','h','bl','vig'].forEach(k=>o[k]=c[k])});commit();dirty=true;toast('اتطبق على كل المقاطع')}
+    else if(act==='applyall'){const c=selObj();S.clips.forEach(o=>{['preset','b','c','s','h','bl','vig','temp','tint','fx','fxs'].forEach(k=>o[k]=c[k])});commit();dirty=true;toast('اتطبق على كل المقاطع')}
     else if(act==='clipl'||act==='clipr'){const c=selObj(),i=S.clips.indexOf(c),j=act==='clipl'?i-1:i+1;if(j>=0&&j<S.clips.length){S.clips.splice(i,1);S.clips.splice(j,0,c);layout();commit();refreshAll();seekTo(c._s)}}
   };
   $$('[data-sid]',B).forEach(el=>{
