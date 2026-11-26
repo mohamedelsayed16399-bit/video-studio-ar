@@ -10,7 +10,7 @@ const FONT='Cairo,Tajawal,"Noto Sans Arabic",Arial,sans-serif';
 const PRESETS={none:{n:'بدون'},bw:{n:'أبيض وأسود',g:100},sepia:{n:'سيبيا',sp:85},vivid:{n:'حيوي',s:150,c:115},cool:{n:'بارد',h:-20,s:115,b:102},warm:{n:'دافئ',h:14,s:115,sp:15},vintage:{n:'قديم',sp:45,c:90,b:105,s:80},fade:{n:'باهت',c:80,b:115,s:75},drama:{n:'درامي',c:145,s:110,b:88},noir:{n:'نوار',g:100,c:150,b:90},neon:{n:'نيون',h:-40,s:190,c:120},invert:{n:'معكوس',inv:100}};
 const S={aspect:'16:9',clips:[],texts:[],subs:[],audios:[],overlays:[],subStyle:{size:5.4,color:'#ffffff',bg:true,pos:88,burn:true,kar:false,khc:'#ffe14d'},playhead:0,sel:null,tab:'media',pps:50};
 const assets={};
-const SIL={th:-38,min:.5},BEAT={n:2,mus:''};let keyPick=false;
+const SIL={th:-38,min:.5},BEAT={n:2,mus:''},CARD={t:'عنوان الفيديو',s:'اكتب العنوان الفرعي هنا',st:0,d:3};let keyPick=false;
 let total=0, dirty=true, quality=IS_MOBILE?540:720;
 const cv=$('#cv'), cx=cv.getContext('2d');
 
@@ -351,7 +351,7 @@ cv.addEventListener('pointerup',()=>{if(cdrag){cdrag=null;commit()}});
 const TABS=[['media','📁 الوسائط'],['text','🔤 نص'],['subs','💬 ترجمة'],['fx','✨ مؤثرات'],['ov','🖼 ستيكر'],['audio','🎵 صوت'],['export','⬇ تصدير']];
 function renderTabs(){$('#tabs').innerHTML=TABS.map(([k,n])=>`<button data-t="${k}" class="${S.tab===k?'on':''}">${n}</button>`).join('')}
 $('#tabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.tab=b.dataset.t;renderTabs();renderPanel()};
-const obName=o=>o===BEAT?'beat':o===SIL?'sil':o===S.subStyle?'sty':S.sel&&S.sel.k||'';
+const obName=o=>o===CARD?'card':o===BEAT?'beat':o===SIL?'sil':o===S.subStyle?'sty':S.sel&&S.sel.k||'';
 function sld(o,k,label,min,max,step,unit=''){return`<div class="fld"><label>${label}<b>${o[k]}${unit}</b></label><input type="range" data-o="${obName(o)}" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${o[k]}" data-u="${unit}"></div>`}
 function sel_(o,k,label,opts){return`<div class="fld"><label>${label}</label><select data-o="${obName(o)}" data-k="${k}">${opts.map(([v,n])=>`<option value="${v}" ${String(o[k])===String(v)?'selected':''}>${n}</option>`).join('')}</select></div>`}
 function chk(o,k,label){return`<label class="chk"><input type="checkbox" data-o="${obName(o)}" data-k="${k}" ${o[k]?'checked':''}> ${label}</label>`}
@@ -372,6 +372,7 @@ function panelMedia(){
 function panelText(){
   const tx=S.sel&&S.sel.k==='text'?selObj():null;
   let h=`<div class="row"><button class="primary" data-act="addtext">+ نص جديد عند المؤشر</button></div>`;
+  h+=`<div class="h4">🎬 كروت مقدمة / ختام</div><div class="fld"><label>العنوان</label><input type="text" data-o="card" data-k="t" value="${esc(CARD.t)}"></div><div class="fld"><label>سطر فرعي</label><input type="text" data-o="card" data-k="s" value="${esc(CARD.s)}"></div><div class="fld"><label>الستايل</label><select data-o="card" data-k="st">${CARDS.map((c,i)=>`<option value="${i}" ${CARD.st===i?'selected':''}>${c.n}</option>`).join('')}</select></div><div class="row"><button class="primary" data-act="card" data-w="start">+ كارت في البداية</button><button data-act="card" data-w="end">+ كارت في النهاية</button></div>`;
   h+=`<div class="h4">قوالب جاهزة</div><div class="row" style="display:grid;grid-template-columns:1fr 1fr">${TPLS.map((t,i)=>`<button data-act="tpl" data-i="${i}">${t[0]}</button>`).join('')}</div><div class="h4">إيموجي</div><div class="row emo">${['😂','🔥','❤️','👍','⭐','🎉','😍','✅'].map(e=>`<button data-act="emoji">${e}</button>`).join('')}</div>`;
   if(!tx)return h+`<p class="hint">اختار نص من الخط الزمني أو اضغط "نص جديد". تقدر تسحب النص على الشاشة مباشرة.</p>`;
   h+=`<div class="fld"><label>النص</label><textarea data-o="text" data-k="text">${esc(tx.text)}</textarea></div>`;
@@ -463,6 +464,7 @@ function panelExport(){
 function wirePanel(B){
   $$('[data-k]',B).forEach(el=>{
     const ob=el.dataset.o,k=el.dataset.k;if(ob==='sil'){el.addEventListener('input',()=>{SIL[k]=parseFloat(el.value);const b=el.previousElementSibling&&$('b',el.previousElementSibling);if(b)b.textContent=SIL[k]+(el.dataset.u||'')});return}
+    if(ob==='card'){el.addEventListener('input',()=>{CARD[k]=el.type==='number'||k==='st'?+el.value:el.value});return}
     if(ob==='beat'){el.addEventListener('change',()=>{BEAT[k]=k==='n'?+el.value:el.value});return}
     const target=()=>ob==='sil'?SIL:ob==='sty'?S.subStyle:ob==='proj'?S:ob==='exp'?exp:findObj(ob,S.sel&&S.sel.id);
     const val=()=>el.type==='checkbox'?el.checked:(el.type==='range'||el.type==='number')?parseFloat(el.value):(k==='weight'||k==='short'||k==='fps')?+el.value:el.value;
@@ -492,6 +494,7 @@ function wirePanel(B){
     else if(act==='pickkey'){keyPick=true;b.textContent='👆 دوس على اللون الأخضر في الشاشة...';b.classList.add('on');toast('دوس على الخلفية الخضراء في معاينة الفيديو')}
     else if(act==='unsilence')removeSilence();
     else if(act==='beatedit')beatEdit();
+    else if(act==='card')addCard(b.dataset.w);
     else if(act==='freeze')freezeFrame();
     else if(act==='addtext')addText();
     else if(act==='preset'){const n=b.dataset.n,x=addText();x.size=+b.dataset.s;x.text=n==='عنوان كبير'?'العنوان هنا':n==='اسم / تعريف'?'الاسم · الوظيفة':'نص عادي';x.y=n==='اسم / تعريف'?.86:.5;commit();refreshAll()}
@@ -631,6 +634,27 @@ async function demo(){
   S.texts.push({id:uid(),text:'مونتاج وترجمة وتصدير على جهازك',start:3.4,end:6,x:.5,y:.5,size:7,color:'#ffe27a',bgOn:true,bg:'#00000099',anim:'slide',weight:700});
   S.subs=[{id:uid(),s:.5,e:3,t:'ده مثال للترجمة التلقائية'},{id:uid(),s:3.2,e:6,t:'تقدر تعدّل أي سطر بسهولة'},{id:uid(),s:6.2,e:9,t:'وتصدّر الفيديو كامل بضغطة'}];
   S.sel=null;S.tab='media';commit();refreshAll();seekTo(1);
+}
+
+/* ---------- title cards ---------- */
+const CARDS=[{n:'بنفسجي مضيء',a:'#7c5cff',b:'#19d3c5',sh:'circles'},{n:'غروب',a:'#ff512f',b:'#f09819',sh:'bars'},{n:'ليلي أنيق',a:'#0f0c29',b:'#302b63',sh:'lines',c:'#ffe14d'},{n:'أخضر طبيعة',a:'#11998e',b:'#38ef7d',sh:'circles'},{n:'أحمر درامي',a:'#cb2d3e',b:'#1d1d1d',sh:'bars'},{n:'أبيض بسيط',a:'#f5f5f7',b:'#dcdce6',sh:'lines',c:'#222233',dark:true}];
+async function addCard(where){
+  const st=CARDS[CARD.st]||CARDS[0],[w,h]=dims(Math.max(quality,720)),cvs=document.createElement('canvas');cvs.width=w;cvs.height=h;const x=cvs.getContext('2d');
+  const g=x.createLinearGradient(0,0,w,h);g.addColorStop(0,st.a);g.addColorStop(1,st.b);x.fillStyle=g;x.fillRect(0,0,w,h);
+  x.save();x.globalAlpha=.16;x.fillStyle='#fff';
+  if(st.sh==='circles'){[[.15,.2,.22],[.85,.8,.3],[.7,.15,.12],[.3,.9,.15]].forEach(([a,b,r])=>{x.beginPath();x.arc(w*a,h*b,Math.min(w,h)*r,0,7);x.fill()})}
+  else if(st.sh==='bars'){for(let i=0;i<7;i++)x.fillRect(w*(.05+i*.15),0,w*.04,h)}
+  else{x.globalAlpha=.5;x.fillStyle=st.c||'#fff';x.fillRect(w*.3,h*.43,w*.4,Math.max(2,h*.006));x.fillRect(w*.3,h*.64,w*.4,Math.max(2,h*.006))}
+  x.restore();
+  const col=st.dark?'#222233':'#ffffff';
+  x.save();x.shadowColor='rgba(0,0,0,.35)';x.shadowBlur=h*.03;
+  drawCaption(x,w,h,CARD.t||' ',w/2,h*.46,Math.min(14,160/Math.max(8,(CARD.t||'').length)*1.6+3),st.c&&!st.dark?st.c:col,null,{weight:900,stroke:false});
+  x.restore();
+  if(CARD.s)drawCaption(x,w,h,CARD.s,w/2,h*.64,4.6,col,null,{weight:600,stroke:false,alpha:.9});
+  const blob=await new Promise(r=>cvs.toBlob(r,'image/png')),f=new File([blob],'card-'+(CARD.t||'').slice(0,12)+'.png',{type:'image/png'});
+  const ia=await loadAsset(f,'image'),c=Object.assign(defClip(ia.id),{out:CARD.d||3,fit:'cover',bgblur:false,fade:.4});
+  if(where==='start')S.clips.unshift(c);else S.clips.push(c);
+  S.sel={k:'clip',id:c.id};layout();commit();refreshAll();seekTo(c._s+.1);toast('اتضاف كارت ✅');
 }
 
 /* ---------- beat sync + freeze frame ---------- */
