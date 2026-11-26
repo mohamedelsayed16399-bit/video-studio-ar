@@ -223,6 +223,10 @@ function drawFrame(ctx,w,h,t,opt={}){
     if(tx.anim==='fade')alpha=Math.min(1,lt/.4,(d-lt)/.4);
     else if(tx.anim==='pop'){sc=.55+.45*easeBack(Math.min(1,lt/.35));alpha=Math.min(1,lt/.12,(d-lt)/.25)}
     else if(tx.anim==='slide'){dy=(1-easeOut(Math.min(1,lt/.45)))*h*.1;alpha=Math.min(1,lt/.3,(d-lt)/.3)}
+    else if(tx.anim==='words'){const ws=tx.text.split(' ');txt=ws.slice(0,Math.max(1,Math.ceil(ws.length*Math.min(1,lt/(d*.6))))).join(' ');alpha=Math.min(1,(d-lt)/.25)}
+    else if(tx.anim==='zoom'){const k=easeOut(Math.min(1,lt/.5));sc=2.2-1.2*k;alpha=Math.min(k*1.5,1,(d-lt)/.25)}
+    else if(tx.anim==='bounce'){const k=Math.min(1,lt/.7);dy=-Math.abs(Math.sin(k*Math.PI*3))*(1-k)*h*.14;alpha=Math.min(1,lt/.1,(d-lt)/.25)}
+    else if(tx.anim==='float'){dy=Math.sin(lt*2.4)*h*.012;alpha=Math.min(1,lt/.3,(d-lt)/.3)}
     else if(tx.anim==='type'){txt=[...tx.text].slice(0,Math.ceil([...tx.text].length*Math.min(1,lt/(d*.55)))).join('')}
     if(!txt)return;
     drawCaption(ctx,w,h,txt,tx.x*w,tx.y*h,tx.size,tx.color,tx.bgOn?tx.bg:null,{alpha,sc,dy,weight:tx.weight});
@@ -404,7 +408,7 @@ function panelText(){
   h+=`<div class="r2"><div class="fld"><label>يبدأ (ثانية)</label><input type="number" step="0.1" min="0" data-o="text" data-k="start" value="${tx.start.toFixed(1)}"></div><div class="fld"><label>ينتهي (ثانية)</label><input type="number" step="0.1" min="0" data-o="text" data-k="end" value="${tx.end.toFixed(1)}"></div></div>`;
   h+=sld(tx,'size','الحجم',2,30,.5,'%')+sld(tx,'x','أفقي',0,1,.01)+sld(tx,'y','رأسي',0,1,.01);
   h+=`<div class="r3">${clr(tx,'color','لون النص')}${clr(tx,'bg','لون الخلفية')}${chk(tx,'bgOn','خلفية')}</div>`;
-  h+=sel_(tx,'anim','الحركة',[['none','بدون'],['fade','ظهور تدريجي'],['pop','بوب'],['slide','انزلاق'],['type','كتابة']]);
+  h+=sel_(tx,'anim','الحركة',[['none','بدون'],['fade','ظهور تدريجي'],['pop','بوب'],['slide','انزلاق'],['type','كتابة'],['words','كلمة كلمة'],['zoom','زووم داخل'],['bounce','نطّ'],['float','طفو']]);
   h+=sel_(tx,'weight','السُمك',[[400,'عادي'],[700,'عريض'],[900,'عريض جداً']]);
   return h;
 }
