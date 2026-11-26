@@ -945,3 +945,14 @@ setCanvasSize(quality);commit();refreshAll();requestAnimationFrame(tick);checkSa
 })();
 (function(){const st=document.createElement('style');st.textContent='@media(max-width:560px){#top{gap:4px;padding-left:6px;padding-right:6px}#top .brand{font-size:13px;white-space:nowrap}#top .brand .logo{display:none}#top .ib{min-width:34px;width:34px;padding:0}#btnExport{padding:8px 10px;white-space:nowrap;font-size:13px}}';document.head.appendChild(st)})();
 window.__ramp={srcTime,cdur,rampSpeedAt};
+
+/* ===== R24: first-run welcome tour ===== */
+(function(){
+  try{if(localStorage.getItem('vs_tour'))return}catch(e){return}
+  const steps=[['🎬 أهلاً في استوديو الفيديو','كل حاجة بتشتغل على جهازك. مفيش رفع ولا حساب.'],['1) ضيف ملفاتك','اضغط "اختار ملفات" أو اسحبها. وبعدين "+ للمقاطع" عشان تنزل على الخط الزمني. وفيه "مثال جاهز" لو عايز تجرّب.'],['2) عدّل وزوّق','قص بـ S، انتقالات، فلاتر، كروما، سرعة متغيرة، عناوين وستيكرز، وستايلات جاهزة بضغطة.'],['3) ترجمة تلقائية وتصدير','تبويب "ترجمة" بيطلّع الكلام بالعربي لوحده. بعدين "تصدير". والمشروع بيتحفظ تلقائي، و💾 بيحفظه كملف. اضغط ؟ للاختصارات.']];
+  let i=0;const d=document.createElement('div');d.id='tourBox';d.dir='rtl';d.style.cssText='position:fixed;inset:0;background:#000b;z-index:98;display:flex;align-items:center;justify-content:center;padding:16px';
+  function draw(){const [h,t]=steps[i];d.innerHTML='<div style="background:#1a1c26;border:1px solid #3a3d52;border-radius:16px;padding:20px 22px;max-width:400px;width:100%;color:#eee"><h3 style="margin:0 0 8px">'+h+'</h3><p style="line-height:1.7;margin:0 0 14px">'+t+'</p><div style="display:flex;gap:8px;align-items:center"><button class="primary" id="tourNext" style="flex:1">'+(i<steps.length-1?'التالي':'يلا نبدأ')+'</button><button id="tourSkip">تخطي</button></div><div style="text-align:center;margin-top:10px;opacity:.6;font-size:13px">'+(i+1)+' / '+steps.length+'</div></div>';
+    d.querySelector('#tourNext').onclick=()=>{if(i<steps.length-1){i++;draw()}else end()};d.querySelector('#tourSkip').onclick=end}
+  function end(){try{localStorage.setItem('vs_tour','1')}catch(e){}d.remove()}
+  setTimeout(()=>{if(window.__noTour)return;draw();document.body.appendChild(d)},900);
+})();
