@@ -475,9 +475,10 @@ function panelOv(){
   const o=S.sel&&S.sel.k==='ov'?selObj():null;const imgs=Object.values(assets).filter(a=>a.type==='image'||a.type==='video');
   let h=`<p class="hint">ستيكر أو لوجو أو فيديو صغير (صورة داخل صورة PIP) فوق الفيديو. ضيف الملف من تبويب الوسائط وبعدين اضغط "+ عند المؤشر".</p>`+imgs.map(a=>`<div class="subitem"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>${a.type==='video'?'🎞':'🖼'} ${esc(a.name)}</span><button data-act="ov" data-id="${a.id}">+ عند المؤشر</button></div></div>`).join('');
   if(!o)return h+(imgs.length?'<p class="hint">اختار ستيكر من الخط الزمني للتعديل.</p>':'');
-  return h+`<div class="h4">تعديل الستيكر</div>${sld(o,'size','الحجم (% من العرض)',3,100,1,'%')}${sld(o,'x','أفقي',0,1,.01)}${sld(o,'y','رأسي',0,1,.01)}${sld(o,'rot','دوران',-180,180,1,'°')}${sld(o,'opacity','الشفافية',10,100,1,'%')}${sld(o,'rad','تدوير الحواف',0,50,1,'%')}${sld(o,'bd','إطار أبيض',0,10,1)}${assets[o.aid]&&assets[o.aid].type==='video'?`<div class="fld"><label>يبدأ الفيديو من (ث)</label><input type="number" step="0.1" min="0" data-o="ov" data-k="in" value="${(o.in||0).toFixed(1)}"></div>`:''}${sel_(o,'anim','الحركة',[['none','بدون'],['fade','ظهور تدريجي'],['pop','بوب'],['float','طفو']])}
+  return h+`<div class="h4">تخطيط سريع</div><div class="presets" style="grid-template-columns:repeat(4,1fr)">${OVL.map(([n,sz,x,y],i)=>`<button data-act="ovlay" data-i="${i}" style="padding:10px 2px;font-size:12px">${n}</button>`).join('')}</div><div class="h4">تعديل الستيكر</div>${sld(o,'size','الحجم (% من العرض)',3,100,1,'%')}${sld(o,'x','أفقي',0,1,.01)}${sld(o,'y','رأسي',0,1,.01)}${sld(o,'rot','دوران',-180,180,1,'°')}${sld(o,'opacity','الشفافية',10,100,1,'%')}${sld(o,'rad','تدوير الحواف',0,50,1,'%')}${sld(o,'bd','إطار أبيض',0,10,1)}${assets[o.aid]&&assets[o.aid].type==='video'?`<div class="fld"><label>يبدأ الفيديو من (ث)</label><input type="number" step="0.1" min="0" data-o="ov" data-k="in" value="${(o.in||0).toFixed(1)}"></div>`:''}${sel_(o,'anim','الحركة',[['none','بدون'],['fade','ظهور تدريجي'],['pop','بوب'],['float','طفو']])}
   <div class="r2"><div class="fld"><label>يبدأ (ث)</label><input type="number" step="0.1" min="0" data-o="ov" data-k="start" value="${o.start.toFixed(1)}"></div><div class="fld"><label>ينتهي (ث)</label><input type="number" step="0.1" min="0" data-o="ov" data-k="end" value="${o.end.toFixed(1)}"></div></div><p class="hint">تقدر تسحب الستيكر على الشاشة.</p>`;
 }
+const OVL=[['↖ ركن',28,.17,.2],['↗ ركن',28,.83,.2],['↙ ركن',28,.17,.8],['↘ ركن',28,.83,.8],['◀ نص شمال',50,.25,.5,0],['نص يمين ▶',50,.75,.5,0],['وسط كبير',70,.5,.5],['ملء الشاشة',100,.5,.5,0]];
 const TPLS=[
  ['عنوان سينمائي',{text:'العنوان هنا',size:12,weight:900,anim:'fade',y:.5,color:'#ffffff',bgOn:false}],
  ['ثلث سفلي',{text:'الاسم · الوظيفة',size:5.5,weight:700,anim:'slide',y:.82,x:.5,color:'#ffffff',bgOn:true,bg:'#7c5cffdd'}],
@@ -551,6 +552,7 @@ function wirePanel(B){
     else if(act==='rot'){const c=selObj();c.rot=((c.rot||0)+1)%4;commit();dirty=true}
     else if(act==='flip'){const c=selObj();c.flip=!c.flip;commit();renderPanel();dirty=true}
     else if(act==='ramp'){const c=selObj();c.ramp=b.dataset.v||undefined;layout();commit();renderPanel();refreshAll();seekTo(S.playhead)}
+    else if(act==='ovlay'){const o=selObj();const L=OVL[+b.dataset.i];o.size=L[1];o.x=L[2];o.y=L[3];if(L[4]!=null)o.rad=L[4];commit();renderPanel();dirty=true}
     else if(act==='trans'){const c=selObj();c.trans=b.dataset.v;commit();renderPanel();dirty=true}
     else if(act==='pickkey'){keyPick=true;b.textContent='👆 دوس على اللون الأخضر في الشاشة...';b.classList.add('on');toast('دوس على الخلفية الخضراء في معاينة الفيديو')}
     else if(act==='pack')applyPack(+b.dataset.i);
