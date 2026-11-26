@@ -70,7 +70,7 @@ input[type=color]{width:44px;height:34px;padding:0;border:1px solid #333a50;bord
 #ruler i{position:absolute;top:0;height:100%;border-left:1px solid #3a4056;font-style:normal;font-size:10px;color:var(--mu);padding-left:3px;line-height:22px}
 .trk{position:relative;margin-top:5px;background:rgba(255,255,255,.03)}
 .trk::before{content:attr(data-l);position:sticky;left:2px;display:inline-block;z-index:3;font-size:11px;background:#000a;border-radius:4px;padding:0 4px;top:0}
-#trV{height:58px}#trT{height:30px}#trS{height:30px}#trA{height:36px}
+#trO{height:30px}#trV{height:58px}#trT{height:30px}#trS{height:30px}#trA{height:36px}
 .blk{position:absolute;top:0;bottom:0;border-radius:7px;overflow:hidden;display:flex;align-items:center;font-size:11px;border:2px solid transparent;cursor:grab;background-size:auto 100%;background-repeat:repeat-x}
 .blk span{padding:0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;text-shadow:0 1px 3px #000;direction:auto}
 .blk.sel{border-color:#fff;z-index:2}
@@ -99,4 +99,7 @@ video.res{width:100%;border-radius:10px;background:#000;margin-top:8px}
   button,input[type=text],select{min-height:42px}
   .ib{width:44px}
   #top{position:sticky;top:0;z-index:20}
-           }
+}
+
+.blk.ovl{background-color:#c27a1e;background-size:auto 100%;background-repeat:no-repeat}
+.row.emo{display:flex}.row.emo button{font-size:20px;padding:4px;min-width:0}
