@@ -21,7 +21,12 @@ function toast(m,ms=3200){const e=$('#toast');e.textContent=m;e.style.display='b
 function dims(short=quality){const [a,b]=ASPECTS[S.aspect];if(a>=b)return[Math.round(short*a/b/2)*2,short];return[short,Math.round(short*b/a/2)*2]}
 function fitCanvas(){const wr=$('#cwrap'),W=wr.clientWidth-16,H=wr.clientHeight-16,[a,b]=ASPECTS[S.aspect];if(W<=0||H<=0)return;let w=W,h=W*b/a;if(h>H){h=H;w=H*a/b}cv.style.width=w+'px';cv.style.height=h+'px';cv.style.left=((wr.clientWidth-w)/2)+'px';cv.style.top=((wr.clientHeight-h)/2)+'px'}
 function setCanvasSize(short){const[w,h]=dims(short);if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h}fitCanvas();dirty=true}
-const cdur=c=>(c.out-c.in)/c.speed;
+const RAMPS={slowmid:f=>1-.8*Math.pow(Math.sin(Math.PI*f),2),burst:f=>.25+1.75*Math.pow(Math.cos(Math.PI*f),2)*0+.25*0+ (1.6-1.35*Math.pow(Math.sin(Math.PI*f),2)),up:f=>.3+2.2*f*f,down:f=>2.5-2.2*Math.sqrt(f),pulse:f=>1+.9*Math.sin(f*Math.PI*4)};
+function rampTab(c){const key=c.ramp+'|'+c.in+'|'+c.out+'|'+c.speed;if(c._rk===key)return c._rt;const N=120,span=c.out-c.in,fn=RAMPS[c.ramp],T=[0],F=[0];
+  for(let i=0;i<N;i++){const f=(i+.5)/N,v=Math.max(.05,fn(f))*c.speed;T.push(T[i]+span/N/v)}
+  c._rk=key;c._rt=T;return T}
+function rampSpeedAt(c,t){const T=rampTab(c),N=T.length-1,lt=clamp(t-c._s,0,T[N]);let lo=0,hi=N;while(hi-lo>1){const m=(lo+hi)>>1;if(T[m]<=lt)lo=m;else hi=m}return Math.max(.05,RAMPS[c.ramp]((lo+.5)/N))*c.speed}
+const cdur=c=>{if(c.ramp&&RAMPS[c.ramp]){const T=rampTab(c);return T[T.length-1]}return (c.out-c.in)/c.speed};
 function layout(){let t=0;S.clips.forEach(c=>{c._s=t;t+=cdur(c)});total=t;return t}
 function clipAt(t){for(let i=0;i<S.clips.length;i++){const c=S.clips[i];if(t<c._s+cdur(c)-1e-6)return i}return S.clips.length?S.clips.length-1:-1}
 const arrOf=k=>k==='clip'?S.clips:k==='text'?S.texts:k==='sub'?S.subs:k==='ov'?S.overlays:S.audios;
@@ -259,17 +264,17 @@ function render(){drawFrame(cx,cv.width,cv.height,S.playhead);if(P.exporting){_j
 /* ---------- player ---------- */
 const P={playing:false,t0:0,w0:0,active:-2,exporting:false,onEnd:null};
 function stopMedia(){OVEL.forEach(e=>{if(!e.paused)e.pause()});Object.values(assets).forEach(a=>{if(a.el&&!a.el.paused)a.el.pause()})}
-function srcTime(c,t){return c.in+(t-c._s)*c.speed}
+function srcTime(c,t){if(c.ramp&&RAMPS[c.ramp]){const T=rampTab(c),N=T.length-1,lt=clamp(t-c._s,0,T[N]);let lo=0,hi=N;while(hi-lo>1){const m=(lo+hi)>>1;if(T[m]<=lt)lo=m;else hi=m}const fr=(lt-T[lo])/Math.max(1e-9,T[lo+1]-T[lo]);return c.in+(c.out-c.in)*(lo+fr)/N}return c.in+(t-c._s)*c.speed}
 function startClip(i,t){
   const c=S.clips[i],a=c&&assets[c.aid];if(!a||a.type!=='video')return;const el=a.el;
-  el.playbackRate=clamp(c.speed,.0625,16);el.volume=c.mute?0:clamp(c.vol/100,0,1);
+  el.playbackRate=clamp(c.ramp&&RAMPS[c.ramp]?rampSpeedAt(c,t):c.speed,.0625,16);el.volume=c.mute?0:clamp(c.vol/100,0,1);
   const want=srcTime(c,t);if(Math.abs(el.currentTime-want)>.05)el.currentTime=want;
   if(P.playing)el.play().catch(()=>{});
 }
 function syncMedia(t){
   const ci=clipAt(t);
   if(ci!==P.active){P.active=ci;const cur=ci>=0&&assets[S.clips[ci].aid];Object.values(assets).forEach(a=>{if(a.type==='video'&&a!==cur&&a.el&&!a.el.paused)a.el.pause()});if(ci>=0)startClip(ci,t)}
-  else if(ci>=0){const c=S.clips[ci],a=assets[c.aid];if(a&&a.type==='video'){const want=srcTime(c,t);if(Math.abs(a.el.currentTime-want)>.4&&!a.el.seeking){a.el.currentTime=want}if(a.el.paused&&P.playing&&!a.el.seeking)a.el.play().catch(()=>{})}}
+  else if(ci>=0){const c=S.clips[ci],a=assets[c.aid];if(a&&a.type==='video'){const want=srcTime(c,t);if(c.ramp&&RAMPS[c.ramp])a.el.playbackRate=clamp(rampSpeedAt(c,t),.0625,16);if(Math.abs(a.el.currentTime-want)>(c.ramp?.25:.4)&&!a.el.seeking){a.el.currentTime=want}if(a.el.paused&&P.playing&&!a.el.seeking)a.el.play().catch(()=>{})}}
   S.overlays.forEach(ov=>{const e=ovEl(ov);if(!e)return;const inr=t>=ov.start&&t<=ov.end,want=(ov.in||0)+(t-ov.start);
     if(inr&&P.playing){if(e.paused){try{e.currentTime=want}catch(x){}e.play().catch(()=>{})}else if(Math.abs(e.currentTime-want)>.4)e.currentTime=want}else if(!e.paused)e.pause()});
   S.audios.forEach(u=>{const a=assets[u.aid];if(!a||!a.el)return;const d=u.out-u.in,inr=t>=u.start&&t<u.start+d;
@@ -310,7 +315,7 @@ function splitAt(){
   if(S.sel&&S.sel.k==='text'){const x=selObj();if(x&&t>x.start+.2&&t<x.end-.2){const y={...x,id:uid(),start:t};x.end=t;S.texts.push(y);commit();refreshAll();return}}
   const i=clipAt(t);if(i<0)return;const c=S.clips[i];const lt=t-c._s;
   if(lt<.15||cdur(c)-lt<.15){toast('حرّك المؤشر لنقطة جوه المقطع');return}
-  const s=c.in+lt*c.speed;const n={...c,id:uid(),in:s,fade:0};c.out=s;c.fade=0;S.clips.splice(i+1,0,n);layout();S.sel={k:'clip',id:n.id};commit();refreshAll();seekTo(t);
+  const s=srcTime(c,t);const rp=c.ramp;const n={...c,id:uid(),in:s,fade:0};c.out=s;if(rp){c.ramp=n.ramp=undefined;toast('اتشالت السرعة المتغيرة من القطعتين بعد القص')}c.fade=0;S.clips.splice(i+1,0,n);layout();S.sel={k:'clip',id:n.id};commit();refreshAll();seekTo(t);
 }
 function delSel(){
   if(!S.sel)return;const{k,id}=S.sel;const arr=arrOf(k);const i=arr.findIndex(o=>o.id===id);if(i<0)return;
@@ -459,7 +464,7 @@ function panelFx(){
   if(a.type==='video')h+=`<div class="h4">✂ حذف الصمت تلقائي</div><p class="hint">بيقطع الفترات الساكتة من المقطع ويسيب الكلام بس.</p>${sld(SIL,'th','حساسية الصوت (dB)',-60,-20,1)}${sld(SIL,'min','أقل مدة صمت تتحذف',.2,2,.05,'s')}<div class="row"><button class="primary" data-act="unsilence" id="silBtn">✂ احذف الصمت</button></div>`;
   if(a.type==='video')h+=`<div class="row" style="margin-top:10px"><button data-act="freeze">❄ تجميد اللقطة عند المؤشر (٢ث)</button></div>`;
   h+=`<div class="h4">انتقال عند بداية المقطع</div><div class="presets" style="grid-template-columns:repeat(3,1fr)">${[['none','بدون'],['fade','تلاشي'],['dip','عبر الأسود'],['slide','انزلاق'],['wipe','مسح'],['zoom','زووم'],['circle','دايرة'],['blinds','ستاير'],['pixel','بكسل'],['spin','دوران'],['push','دفع']].map(([v,n])=>`<button data-act="trans" data-v="${v}" class="${(c.trans||'none')===v?'on':''}" style="padding:10px 4px">${n}</button>`).join('')}</div>${c.trans&&c.trans!=='none'?sld(c,'transD','مدة الانتقال',.2,1.5,.1,'s'):''}<p class="hint">الانتقال بيظهر بين المقطع ده والمقطع اللي قبله.</p><div class="h4">الحركة والإطار</div><div class="row"><button data-act="rot">⟳ لف ٩٠°</button><button data-act="flip" class="${c.flip?'on':''}">⇋ قلب</button></div>${sel_(c,'fit','ملء الشاشة',[['contain','احتواء'],['cover','قص وملء']])}${chk(c,'bgblur','خلفية ضبابية لو فيه فراغ')}${sld(c,'zoom','تكبير',100,300,1,'%')}${sld(c,'cl','قص من اليسار',0,60,1,'%')}${sld(c,'cr','قص من اليمين',0,60,1,'%')}${sld(c,'ct','قص من فوق',0,60,1,'%')}${sld(c,'cb','قص من تحت',0,60,1,'%')}${sld(c,'kb','تكبير تدريجي (Ken Burns)',0,60,1,'%')}${sld(c,'px','إزاحة أفقية',-50,50,1,'%')}${sld(c,'py','إزاحة رأسية',-50,50,1,'%')}${sld(c,'fade','دخول/خروج تدريجي من الأسود',0,2,.1,'s')}`;
-  if(a.type==='video')h+=`<div class="h4">سرعة وصوت</div>${sld(c,'speed','السرعة',.25,4,.05,'×')}${sld(c,'vol','مستوى الصوت',0,100,1,'%')}${chk(c,'mute','كتم صوت المقطع')}`;
+  if(a.type==='video')h+=`<div class="h4">سرعة وصوت</div>${sld(c,'speed','السرعة',.25,4,.05,'×')}<div class="h4">سرعة متغيرة (Speed Ramp)</div><div class="presets" style="grid-template-columns:repeat(3,1fr)">${[['','ثابتة'],['slowmid','سلو-مو في النص'],['burst','سريع-بطيء-سريع'],['up','تسارع'],['down','تباطؤ'],['pulse','نبض']].map(([v,n])=>`<button data-act="ramp" data-v="${v}" class="${(c.ramp||'')===v?'on':''}" style="padding:10px 4px">${n}</button>`).join('')}</div>${sld(c,'vol','مستوى الصوت',0,100,1,'%')}${chk(c,'mute','كتم صوت المقطع')}`;
   else h+=`<div class="h4">المدة</div><div class="fld"><label>مدة الصورة (ثانية)</label><input type="number" step="0.5" min="0.5" max="120" data-o="clip" data-k="out" value="${c.out}"></div>`;
   h+=`<div class="row"><button data-act="clipl">◀ حرّك للبداية</button><button data-act="clipr">حرّك للنهاية ▶</button></div><div class="row"><button data-act="applyall">طبّق الفلتر على كل المقاطع</button></div>`;
   return h;
@@ -543,6 +548,7 @@ function wirePanel(B){
     else if(act==='subpre')applySubPre(+b.dataset.i);
     else if(act==='rot'){const c=selObj();c.rot=((c.rot||0)+1)%4;commit();dirty=true}
     else if(act==='flip'){const c=selObj();c.flip=!c.flip;commit();renderPanel();dirty=true}
+    else if(act==='ramp'){const c=selObj();c.ramp=b.dataset.v||undefined;layout();commit();renderPanel();refreshAll();seekTo(S.playhead)}
     else if(act==='trans'){const c=selObj();c.trans=b.dataset.v;commit();renderPanel();dirty=true}
     else if(act==='pickkey'){keyPick=true;b.textContent='👆 دوس على اللون الأخضر في الشاشة...';b.classList.add('on');toast('دوس على الخلفية الخضراء في معاينة الفيديو')}
     else if(act==='pack')applyPack(+b.dataset.i);
@@ -783,7 +789,7 @@ async function freezeFrame(){
   const [w,h]=dims(Math.max(quality,720)),cvs=document.createElement('canvas');cvs.width=w;cvs.height=h;const x=cvs.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,w,h);
   drawClipLayer(x,Object.assign({},c,{fade:0}),a,w,h,t);
   const blob=await new Promise(r=>cvs.toBlob(r,'image/png'));const f=new File([blob],'freeze-'+fmt(t)+'.png',{type:'image/png'});
-  const ia=await loadAsset(f,'image');const lt=t-c._s,sp=c.in+lt*c.speed;
+  const ia=await loadAsset(f,'image');const lt=t-c._s,sp=srcTime(c,t);if(c.ramp){c.ramp=undefined}
   const fr=Object.assign(defClip(ia.id),{out:2,fit:'contain',bgblur:false,vol:0,preset:c.preset,b:c.b,c:c.c,s:c.s,h:c.h});
   if(lt>.1&&cdur(c)-lt>.1){const n=Object.assign({},c,{id:uid(),in:sp,fade:0,trans:'none'});c.out=sp;S.clips.splice(i+1,0,fr,n)}else S.clips.splice(lt<=.1?i:i+1,0,fr);
   S.sel={k:'clip',id:fr.id};layout();commit();refreshAll();seekTo(fr._s+.1);toast('اتجمّدت اللقطة ❄️');
@@ -937,3 +943,4 @@ setCanvasSize(quality);commit();refreshAll();requestAnimationFrame(tick);checkSa
   });
 })();
 (function(){const st=document.createElement('style');st.textContent='@media(max-width:560px){#top{gap:4px;padding-left:6px;padding-right:6px}#top .brand{font-size:13px;white-space:nowrap}#top .brand .logo{display:none}#top .ib{min-width:34px;width:34px;padding:0}#btnExport{padding:8px 10px;white-space:nowrap;font-size:13px}}';document.head.appendChild(st)})();
+window.__ramp={srcTime,cdur,rampSpeedAt};
