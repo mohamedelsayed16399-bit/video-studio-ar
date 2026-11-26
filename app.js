@@ -486,7 +486,7 @@ function bestMime(f){
 }
 function panelExport(){
   const mp4=bestMime('mp4');
-  return`<div class="fld"><label>أبعاد الفيديو</label><select data-o="proj" data-k="aspect">${Object.keys(ASPECTS).map(k=>`<option value="${k}" ${S.aspect===k?'selected':''}>${k}${{'16:9':' (يوتيوب)','9:16':' (ريلز / تيك توك)','1:1':' (مربع)','4:5':' (إنستجرام)','4:3':''}[k]}</option>`).join('')}</select></div>
+  return`<div class="fld"><label>جودة المعاينة (قلّلها لو الجهاز بطيء)</label><select data-o="pv" data-k="q">${[[360,'خفيفة 360p'],[540,'متوسطة 540p'],[720,'عالية 720p']].map(([v,n])=>`<option value="${v}" ${quality===v?'selected':''}>${n}</option>`).join('')}</select></div><div class="fld"><label>أبعاد الفيديو</label><select data-o="proj" data-k="aspect">${Object.keys(ASPECTS).map(k=>`<option value="${k}" ${S.aspect===k?'selected':''}>${k}${{'16:9':' (يوتيوب)','9:16':' (ريلز / تيك توك)','1:1':' (مربع)','4:5':' (إنستجرام)','4:3':''}[k]}</option>`).join('')}</select></div>
   <div class="r2"><div class="fld"><label>الجودة</label><select data-o="exp" data-k="short">${[[480,'480p خفيف'],[720,'720p HD'],[1080,'1080p Full HD']].map(([v,n])=>`<option value="${v}" ${exp.short===v?'selected':''}>${n}</option>`).join('')}</select></div>
   <div class="fld"><label>الإطارات</label><select data-o="exp" data-k="fps">${[24,30,60].map(v=>`<option value="${v}" ${exp.fps===v?'selected':''}>${v} إطار/ث</option>`).join('')}</select></div></div>
   <div class="fld"><label>الصيغة</label><select data-o="exp" data-k="fmt"><option value="auto" ${exp.fmt==='auto'?'selected':''}>تلقائي ${mp4?'(MP4)':'(WebM)'}</option><option value="webm" ${exp.fmt==='webm'?'selected':''}>WebM</option>${mp4?`<option value="mp4" ${exp.fmt==='mp4'?'selected':''}>MP4</option>`:''}</select></div>
@@ -499,6 +499,7 @@ function panelExport(){
 function wirePanel(B){
   $$('[data-k]',B).forEach(el=>{
     const ob=el.dataset.o,k=el.dataset.k;if(ob==='sil'){el.addEventListener('input',()=>{SIL[k]=parseFloat(el.value);const b=el.previousElementSibling&&$('b',el.previousElementSibling);if(b)b.textContent=SIL[k]+(el.dataset.u||'')});return}
+    if(ob==='pv'){el.addEventListener('change',()=>{quality=+el.value;setCanvasSize(quality);dirty=true;toast('جودة المعاينة '+quality+'p')});return}
     if(ob==='duck'){const h=()=>{DUCK[k]=el.type==='checkbox'?el.checked:parseFloat(el.value);const b=el.previousElementSibling&&$('b',el.previousElementSibling);if(b&&el.type==='range')b.textContent=DUCK[k]+'%'};el.addEventListener('input',h);el.addEventListener('change',h);return}
     if(ob==='enh'){el.addEventListener('input',()=>{ENH[k]=el.type==='checkbox'?el.checked:parseFloat(el.value);applyEnh();const b=el.previousElementSibling&&$('b',el.previousElementSibling);if(b&&el.type==='range')b.textContent=ENH[k]+'%'});el.addEventListener('change',()=>{ENH[k]=el.type==='checkbox'?el.checked:parseFloat(el.value);applyEnh()});return}
     if(ob==='card'){el.addEventListener('input',()=>{CARD[k]=el.type==='number'||k==='st'?+el.value:el.value});return}
