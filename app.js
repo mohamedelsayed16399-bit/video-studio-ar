@@ -37,7 +37,7 @@ function redo(){if(H.i<H.a.length-1){H.i++;restore(H.a[H.i]);updUndo()}}
 function updUndo(){$('#undo').disabled=H.i<=0;$('#redo').disabled=H.i>=H.a.length-1;$('#undo').style.opacity=H.i<=0?.4:1;$('#redo').style.opacity=H.i>=H.a.length-1?.4:1}
 
 /* ---------- audio graph (preview + export) ---------- */
-let AC=null,monitor=null,aDest=null;const ENHN={},ENH={on:false,vol:100};
+let AC=null,monitor=null,aDest=null;const ENHN={},ENH={on:false,vol:100},DUCK={on:false,lvl:25};
 function applyEnh(){if(!ENHN.hp)return;const o=ENH.on;ENHN.hp.frequency.value=o?90:10;ENHN.cmp.threshold.value=o?-30:0;ENHN.cmp.ratio.value=o?5:1;ENHN.cmp.knee.value=o?12:0;ENHN.mk.gain.value=(o?2.0:1)*ENH.vol/100}
 function getAC(){if(!AC){AC=new (window.AudioContext||window.webkitAudioContext)();monitor=AC.createGain();monitor.connect(AC.destination);aDest=AC.createMediaStreamDestination();ENHN.in=AC.createGain();ENHN.hp=AC.createBiquadFilter();ENHN.hp.type='highpass';ENHN.cmp=AC.createDynamicsCompressor();ENHN.mk=AC.createGain();ENHN.in.connect(ENHN.hp);ENHN.hp.connect(ENHN.cmp);ENHN.cmp.connect(ENHN.mk);ENHN.mk.connect(monitor);ENHN.mk.connect(aDest);applyEnh();try{const o=AC.createOscillator(),g=AC.createGain();g.gain.value=0.0001;o.connect(g);g.connect(aDest);o.start()}catch(e){}}return AC}
 function route(el){try{const ac=getAC();const s=ac.createMediaElementSource(el);s.connect(ENHN.in)}catch(e){console.warn('route',e)}}
@@ -253,7 +253,7 @@ function syncMedia(t){
   S.overlays.forEach(ov=>{const e=ovEl(ov);if(!e)return;const inr=t>=ov.start&&t<=ov.end,want=(ov.in||0)+(t-ov.start);
     if(inr&&P.playing){if(e.paused){try{e.currentTime=want}catch(x){}e.play().catch(()=>{})}else if(Math.abs(e.currentTime-want)>.4)e.currentTime=want}else if(!e.paused)e.pause()});
   S.audios.forEach(u=>{const a=assets[u.aid];if(!a||!a.el)return;const d=u.out-u.in,inr=t>=u.start&&t<u.start+d;
-    if(inr&&P.playing){const lt=t-u.start;let f=1;if(u.fi>0)f=Math.min(f,lt/u.fi);if(u.fo>0)f=Math.min(f,(d-lt)/u.fo);a.el.volume=clamp(u.vol/100*clamp(f,0,1),0,1);const want=u.in+(t-u.start);if(a.el.paused){a.el.currentTime=want;a.el.play().catch(()=>{})}else if(Math.abs(a.el.currentTime-want)>.4)a.el.currentTime=want}
+    if(inr&&P.playing){const lt=t-u.start;let f=1;if(u.fi>0)f=Math.min(f,lt/u.fi);if(u.fo>0)f=Math.min(f,(d-lt)/u.fo);if(DUCK.on&&ci>=0&&u.aid!==S.clips[ci].aid){const cc=S.clips[ci],ca=assets[cc.aid];if(ca&&ca.type==='video'&&!cc.mute&&cc.vol>5)f*=DUCK.lvl/100}a.el.volume=clamp(u.vol/100*clamp(f,0,1),0,1);const want=u.in+(t-u.start);if(a.el.paused){a.el.currentTime=want;a.el.play().catch(()=>{})}else if(Math.abs(a.el.currentTime-want)>.4)a.el.currentTime=want}
     else if(!a.el.paused)a.el.pause()});
 }
 function play(){
@@ -376,7 +376,7 @@ cv.addEventListener('pointerup',()=>{if(cdrag){cdrag=null;commit()}});
 const TABS=[['media','📁 الوسائط'],['text','🔤 نص'],['subs','💬 ترجمة'],['fx','✨ مؤثرات'],['ov','🖼 ستيكر'],['audio','🎵 صوت'],['export','⬇ تصدير']];
 function renderTabs(){$('#tabs').innerHTML=TABS.map(([k,n])=>`<button data-t="${k}" class="${S.tab===k?'on':''}">${n}</button>`).join('')}
 $('#tabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.tab=b.dataset.t;renderTabs();renderPanel()};
-const obName=o=>o===ENH?'enh':o===CARD?'card':o===BEAT?'beat':o===SIL?'sil':o===S.subStyle?'sty':S.sel&&S.sel.k||'';
+const obName=o=>o===DUCK?'duck':o===ENH?'enh':o===CARD?'card':o===BEAT?'beat':o===SIL?'sil':o===S.subStyle?'sty':S.sel&&S.sel.k||'';
 function sld(o,k,label,min,max,step,unit=''){return`<div class="fld"><label>${label}<b>${o[k]}${unit}</b></label><input type="range" data-o="${obName(o)}" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${o[k]}" data-u="${unit}"></div>`}
 function sel_(o,k,label,opts){return`<div class="fld"><label>${label}</label><select data-o="${obName(o)}" data-k="${k}">${opts.map(([v,n])=>`<option value="${v}" ${String(o[k])===String(v)?'selected':''}>${n}</option>`).join('')}</select></div>`}
 function chk(o,k,label){return`<label class="chk"><input type="checkbox" data-o="${obName(o)}" data-k="${k}" ${o[k]?'checked':''}> ${label}</label>`}
@@ -463,7 +463,7 @@ function panelAudio(){
   const u=S.sel&&S.sel.k==='audio'?selObj():null;
   const auds=Object.values(assets).filter(a=>a.type==='audio');
   let h=`<div class="row"><button class="primary" data-act="add">+ ملف صوت / موسيقى</button><button id="recBtn">${rec.on?'⏹ إيقاف التسجيل':'🎤 تسجيل تعليق صوتي'}</button></div>`;
-  h+=`<p class="hint">التعليق الصوتي بيتسجل من الميكروفون وبيتحط عند مكان المؤشر.</p><div class="h4">🎚 تحسين الصوت</div>${chk(ENH,'on','تحسين الكلام (قص الدندنة + ضغط + رفع الصوت)')}${sld(ENH,'vol','مستوى الصوت الكلي',20,200,1,'%')}`;
+  h+=`<p class="hint">التعليق الصوتي بيتسجل من الميكروفون وبيتحط عند مكان المؤشر.</p><div class="h4">🎚 تحسين الصوت</div>${chk(ENH,'on','تحسين الكلام (قص الدندنة + ضغط + رفع الصوت)')}${sld(ENH,'vol','مستوى الصوت الكلي',20,200,1,'%')}${chk(DUCK,'on','🎙 خفض الموسيقى تلقائي لما الفيديو فيه كلام')}${DUCK.on?sld(DUCK,'lvl','مستوى الموسيقى أثناء الكلام',5,80,1,'%'):''}`;
   h+=auds.map(a=>`<div class="subitem"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>🎵 ${esc(a.name)} · ${fmtS(a.dur)}</span><button data-act="aud" data-id="${a.id}">+ عند المؤشر</button></div></div>`).join('');
   if(auds.length){if(!BEAT.mus||!assets[BEAT.mus])BEAT.mus=auds[0].id;
     h+=`<div class="h4">🥁 مونتاج تلقائي على إيقاع الموسيقى</div><p class="hint">بيحلل إيقاع الموسيقى ويقطّع مقاطعك (اللي في الخط الزمني) ويرتبها على الضرب. تقدر تتراجع بـ Ctrl+Z.</p>${sel_(BEAT,'mus','الموسيقى',auds.map(a=>[a.id,a.name]))}${sel_(BEAT,'n','القطع كل',[[1,'ضربة'],[2,'ضربتين'],[4,'٤ ضربات'],[8,'٨ ضربات']])}<div class="row"><button class="primary" data-act="beatedit" id="beatBtn">🥁 ابدأ المونتاج التلقائي</button></div>`}
@@ -491,6 +491,7 @@ function panelExport(){
 function wirePanel(B){
   $$('[data-k]',B).forEach(el=>{
     const ob=el.dataset.o,k=el.dataset.k;if(ob==='sil'){el.addEventListener('input',()=>{SIL[k]=parseFloat(el.value);const b=el.previousElementSibling&&$('b',el.previousElementSibling);if(b)b.textContent=SIL[k]+(el.dataset.u||'')});return}
+    if(ob==='duck'){const h=()=>{DUCK[k]=el.type==='checkbox'?el.checked:parseFloat(el.value);const b=el.previousElementSibling&&$('b',el.previousElementSibling);if(b&&el.type==='range')b.textContent=DUCK[k]+'%'};el.addEventListener('input',h);el.addEventListener('change',h);return}
     if(ob==='enh'){el.addEventListener('input',()=>{ENH[k]=el.type==='checkbox'?el.checked:parseFloat(el.value);applyEnh();const b=el.previousElementSibling&&$('b',el.previousElementSibling);if(b&&el.type==='range')b.textContent=ENH[k]+'%'});el.addEventListener('change',()=>{ENH[k]=el.type==='checkbox'?el.checked:parseFloat(el.value);applyEnh()});return}
     if(ob==='card'){el.addEventListener('input',()=>{CARD[k]=el.type==='number'||k==='st'?+el.value:el.value});return}
     if(ob==='beat'){el.addEventListener('change',()=>{BEAT[k]=k==='n'?+el.value:el.value});return}
