@@ -181,6 +181,10 @@ function drawClipLayer(ctx,c,a,w,h,t){
   }
   let z=(c.zoom||100)/100;if(c.kb)z*=1+(c.kb/100)*(lt/d);let shx=0,shy=0;if(c.fx==='pulse'){const ph=(lt*2)%1;z*=1+.06*((c.fxs==null?60:c.fxs)/60)*Math.exp(-ph*5)}else if(c.fx==='shake'){const fr=Math.floor(lt*30),m=(c.fxs==null?60:c.fxs)/100;shx=(rnd(fr,1)-.5)*w*.025*m;shy=(rnd(fr,2)-.5)*h*.025*m;z*=1+.03*m}sc*=z;
   ctx.save();ctx.globalAlpha=fa;ctx.filter=filterStr(c,w);
+  if(c.mask&&c.mask!=='none'){const m=Math.min(w,h)*(c.msz==null?80:c.msz)/100,mx=w/2+(c.mx||0)/100*w,my=h/2+(c.my||0)/100*h;ctx.beginPath();
+    if(c.mask==='circle')ctx.arc(mx,my,m/2,0,7);else if(c.mask==='square')rrect(ctx,mx-m/2,my-m/2,m,m,m*.12);else if(c.mask==='wide')rrect(ctx,mx-m*.8,my-m*.45,m*1.6,m*.9,m*.1);else if(c.mask==='diamond'){ctx.moveTo(mx,my-m/2);ctx.lineTo(mx+m/2,my);ctx.lineTo(mx,my+m/2);ctx.lineTo(mx-m/2,my);ctx.closePath()}
+    else if(c.mask==='heart'){const r=m/2;ctx.moveTo(mx,my+r*.9);ctx.bezierCurveTo(mx-r*1.5,my+r*.1,mx-r*.9,my-r*.9,mx,my-r*.35);ctx.bezierCurveTo(mx+r*.9,my-r*.9,mx+r*1.5,my+r*.1,mx,my+r*.9)}
+    ctx.clip()}
   ctx.translate(w/2+(c.px||0)/100*w+shx,h/2+(c.py||0)/100*h+shy);ctx.rotate(rot);ctx.scale(fl,1);
   ctx.drawImage(src,-sw0*sc/2,-sh0*sc/2,sw0*sc,sh0*sc);ctx.restore();ctx.filter='none';
   postFx(ctx,c,w,h,lt);
@@ -427,6 +431,7 @@ function panelFx(){
   const a=assets[c.aid]||{};
   let h=`<div class="h4">فلاتر</div><div class="presets">${Object.entries(PRESETS).map(([k,p])=>`<button data-act="preset-fx" data-p="${k}" class="${c.preset===k?'on':''}"><canvas width="96" height="60" data-pp="${k}"></canvas>${p.n}</button>`).join('')}</div>`;
   h+=`<div class="h4">ضبط الصورة</div>${sld(c,'b','السطوع',30,200,1,'%')}${sld(c,'c','التباين',30,200,1,'%')}${sld(c,'s','التشبع',0,250,1,'%')}${sld(c,'h','تدرج اللون',-180,180,1,'°')}${sld(c,'bl','تمويه',0,20,.5,'px')}${chk(c,'vig','تعتيم الأطراف')}`;
+  h+=`<div class="h4">⭕ شكل القناع</div><div class="presets" style="grid-template-columns:repeat(3,1fr)">${[['none','بدون'],['circle','دايرة'],['square','مربع مدوّر'],['wide','مستطيل'],['diamond','معيّن'],['heart','قلب']].map(([v,n])=>`<button data-act="mask" data-v="${v}" class="${(c.mask||'none')===v?'on':''}" style="padding:9px 2px;font-size:12px">${n}</button>`).join('')}</div>${c.mask&&c.mask!=='none'?sld(c,'msz','حجم القناع',20,140,1,'%')+sld(c,'mx','إزاحة القناع أفقي',-50,50,1,'%')+sld(c,'my','إزاحة القناع رأسي',-50,50,1,'%'):''}`;
   h+=`<div class="h4">✨ مؤثرات بصرية</div><div class="presets" style="grid-template-columns:repeat(4,1fr)">${Object.entries(FXS).map(([v,n])=>`<button data-act="fx" data-v="${v}" class="${(c.fx||'none')===v?'on':''}" style="padding:9px 2px;font-size:12px">${n}</button>`).join('')}</div>${c.fx&&c.fx!=='none'?sld(c,'fxs','شدة المؤثر',10,100,1,'%'):''}`;
   h+=`<div class="h4">🟩 إزالة الخلفية الخضراء (Chroma Key)</div>${chk(c,'key','فعّل إزالة الخلفية')}<div class="row"><button data-act="pickkey" id="pickKeyBtn">🎯 اختار اللون من الشاشة</button></div>${clr(c,'keyc','لون الخلفية اللي هتتشال')}${sld(c,'keyt','قوة الإزالة',5,90,1)}${sld(c,'keys','نعومة الحواف',1,40,1)}${sel_(c,'keybg','الخلفية البديلة',[['color','لون ثابت'],['grad','تدرج'],['image','صورة من الوسائط']])}${c.keybg==='color'||!c.keybg?clr(c,'keybgc','لون الخلفية البديلة'):''}${c.keybg==='image'?sel_(c,'keyaid','الصورة',[['','— اختار —']].concat(Object.values(assets).filter(x=>x.type==='image').map(x=>[x.id,x.name]))):''}<p class="hint">صوّر قدام ستارة خضراء، فعّل الخيار، واضغط "اختار اللون" وبعدين اضغط على الأخضر في الشاشة.</p>`;
   if(a.type==='video')h+=`<div class="h4">✂ حذف الصمت تلقائي</div><p class="hint">بيقطع الفترات الساكتة من المقطع ويسيب الكلام بس.</p>${sld(SIL,'th','حساسية الصوت (dB)',-60,-20,1)}${sld(SIL,'min','أقل مدة صمت تتحذف',.2,2,.05,'s')}<div class="row"><button class="primary" data-act="unsilence" id="silBtn">✂ احذف الصمت</button></div>`;
@@ -515,6 +520,7 @@ function wirePanel(B){
     else if(act==='flip'){const c=selObj();c.flip=!c.flip;commit();renderPanel();dirty=true}
     else if(act==='trans'){const c=selObj();c.trans=b.dataset.v;commit();renderPanel();dirty=true}
     else if(act==='pickkey'){keyPick=true;b.textContent='👆 دوس على اللون الأخضر في الشاشة...';b.classList.add('on');toast('دوس على الخلفية الخضراء في معاينة الفيديو')}
+    else if(act==='mask'){const c=selObj();c.mask=b.dataset.v;if(c.msz==null)c.msz=80;if(c.mx==null)c.mx=0;if(c.my==null)c.my=0;commit();renderPanel();dirty=true}
     else if(act==='fx'){const c=selObj();c.fx=b.dataset.v;if(c.fxs==null)c.fxs=60;commit();renderPanel();dirty=true}
     else if(act==='unsilence')removeSilence();
     else if(act==='beatedit')beatEdit();
