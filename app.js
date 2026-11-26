@@ -37,9 +37,9 @@ function redo(){if(H.i<H.a.length-1){H.i++;restore(H.a[H.i]);updUndo()}}
 function updUndo(){$('#undo').disabled=H.i<=0;$('#redo').disabled=H.i>=H.a.length-1;$('#undo').style.opacity=H.i<=0?.4:1;$('#redo').style.opacity=H.i>=H.a.length-1?.4:1}
 
 /* ---------- audio graph (preview + export) ---------- */
-let AC=null,monitor=null,aDest=null;const ENHN={},ENH={on:false,vol:100},DUCK={on:false,lvl:25};
+let AC=null,monitor=null,aDest=null;const VIZ={on:false,st:'bars',color:'#19d3c5',pos:88,size:14},VZB=new Uint8Array(128),ENHN={},ENH={on:false,vol:100},DUCK={on:false,lvl:25};
 function applyEnh(){if(!ENHN.hp)return;const o=ENH.on;ENHN.hp.frequency.value=o?90:10;ENHN.cmp.threshold.value=o?-30:0;ENHN.cmp.ratio.value=o?5:1;ENHN.cmp.knee.value=o?12:0;ENHN.mk.gain.value=(o?2.0:1)*ENH.vol/100}
-function getAC(){if(!AC){AC=new (window.AudioContext||window.webkitAudioContext)();monitor=AC.createGain();monitor.connect(AC.destination);aDest=AC.createMediaStreamDestination();ENHN.in=AC.createGain();ENHN.hp=AC.createBiquadFilter();ENHN.hp.type='highpass';ENHN.cmp=AC.createDynamicsCompressor();ENHN.mk=AC.createGain();ENHN.in.connect(ENHN.hp);ENHN.hp.connect(ENHN.cmp);ENHN.cmp.connect(ENHN.mk);ENHN.mk.connect(monitor);ENHN.mk.connect(aDest);applyEnh();try{const o=AC.createOscillator(),g=AC.createGain();g.gain.value=0.0001;o.connect(g);g.connect(aDest);o.start()}catch(e){}}return AC}
+function getAC(){if(!AC){AC=new (window.AudioContext||window.webkitAudioContext)();monitor=AC.createGain();monitor.connect(AC.destination);aDest=AC.createMediaStreamDestination();ENHN.in=AC.createGain();ENHN.hp=AC.createBiquadFilter();ENHN.hp.type='highpass';ENHN.cmp=AC.createDynamicsCompressor();ENHN.mk=AC.createGain();ENHN.in.connect(ENHN.hp);ENHN.hp.connect(ENHN.cmp);ENHN.cmp.connect(ENHN.mk);ENHN.mk.connect(monitor);ENHN.mk.connect(aDest);ENHN.an=AC.createAnalyser();ENHN.an.fftSize=256;ENHN.an.smoothingTimeConstant=.7;ENHN.mk.connect(ENHN.an);applyEnh();try{const o=AC.createOscillator(),g=AC.createGain();g.gain.value=0.0001;o.connect(g);g.connect(aDest);o.start()}catch(e){}}return AC}
 function route(el){try{const ac=getAC();const s=ac.createMediaElementSource(el);s.connect(ENHN.in)}catch(e){console.warn('route',e)}}
 
 /* ---------- import ---------- */
@@ -142,6 +142,14 @@ function postFx(ctx,c,w,h,lt){
   }else if(f==='bars'){ctx.save();ctx.fillStyle='#000';const bh=h*.07+h*.08*k;ctx.fillRect(0,0,w,bh);ctx.fillRect(0,h-bh,w,bh);ctx.restore()}
   else if(f==='flash'){const ph=(lt%1.2)/1.2;const a=Math.max(0,1-ph*6)*.7*k+0;if(a>0.01){ctx.save();ctx.fillStyle='rgba(255,255,255,'+a+')';ctx.fillRect(0,0,w,h);ctx.restore()}}
 }
+function drawViz(ctx,w,h){
+  const an=ENHN.an;an.getByteFrequencyData(VZB);const n=48,hh=h*VIZ.size/100,y0=h*VIZ.pos/100;ctx.save();ctx.fillStyle=VIZ.color;ctx.strokeStyle=VIZ.color;
+  const lv=i=>{let v=0;const a=Math.floor(i*VZB.length*.7/n),b=Math.max(a+1,Math.floor((i+1)*VZB.length*.7/n));for(let k=a;k<b;k++)v=Math.max(v,VZB[k]);return v/255};
+  if(VIZ.st==='bars'){const bw=w*.7/n;for(let i=0;i<n;i++){const v=Math.max(.04,lv(i)),bh=v*hh;rrect(ctx,w*.15+i*bw+bw*.12,y0-bh,bw*.76,bh,bw*.3);ctx.fill()}}
+  else if(VIZ.st==='wave'){ctx.lineWidth=Math.max(2,h*.006);ctx.lineCap='round';ctx.beginPath();for(let i=0;i<n;i++){const x=w*.15+i*w*.7/(n-1),y=y0-Math.max(.03,lv(i))*hh*(i%2?1:-.6);i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.stroke()}
+  else{const cx0=w/2,cy0=y0-hh*.3,r=Math.min(w,h)*.12,m=64;for(let i=0;i<m;i++){const v=Math.max(.04,lv(i%n)),a=i/m*Math.PI*2,l=v*hh*.8;ctx.lineWidth=Math.max(2,w*.004);ctx.beginPath();ctx.moveTo(cx0+Math.cos(a)*r,cy0+Math.sin(a)*r);ctx.lineTo(cx0+Math.cos(a)*(r+l),cy0+Math.sin(a)*(r+l));ctx.stroke()}}
+  ctx.restore();
+}
 const keyC=document.createElement('canvas'),mC=document.createElement('canvas');
 function keyRGB(hex){return[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)]}
 function drawKeyed(ctx,c,a,w,h,t){
@@ -220,6 +228,7 @@ function drawFrame(ctx,w,h,t,opt={}){
     let al=ov.opacity/100,sc=1;if(ov.anim==='fade')al*=Math.min(1,lt/.4,(d-lt)/.4);else if(ov.anim==='pop'){sc=.5+.5*easeBack(Math.min(1,lt/.35));al*=Math.min(1,lt/.1,(d-lt)/.2)}else if(ov.anim==='float')sc=1+Math.sin(lt*3)*.04;
     const dw=w*ov.size/100*sc,dh=dw*a.h/a.w;ctx.save();ctx.globalAlpha=clamp(al,0,1);ctx.translate(ov.x*w,ov.y*h);ctx.rotate((ov.rot||0)*Math.PI/180);if(ov.rad){rrect(ctx,-dw/2,-dh/2,dw,dh,Math.min(dw,dh)*ov.rad/100);ctx.save();ctx.clip()}ctx.drawImage(vel||a.img,-dw/2,-dh/2,dw,dh);if(ov.rad)ctx.restore();if(ov.bd){ctx.lineWidth=Math.max(1,dw*ov.bd/200);ctx.strokeStyle='#fff';if(ov.rad)rrect(ctx,-dw/2,-dh/2,dw,dh,Math.min(dw,dh)*ov.rad/100);else{ctx.beginPath();ctx.rect(-dw/2,-dh/2,dw,dh)}ctx.stroke()}ctx.restore();
   });
+  if(VIZ.on&&ENHN.an)drawViz(ctx,w,h);
   S.texts.forEach(tx=>{
     if(t<tx.start||t>tx.end)return;const lt=t-tx.start,d=Math.max(.1,tx.end-tx.start);let alpha=1,sc=1,dy=0,txt=tx.text;
     if(tx.anim==='fade')alpha=Math.min(1,lt/.4,(d-lt)/.4);
@@ -382,7 +391,7 @@ cv.addEventListener('pointerup',()=>{if(cdrag){cdrag=null;commit()}});
 const TABS=[['media','📁 الوسائط'],['text','🔤 نص'],['subs','💬 ترجمة'],['fx','✨ مؤثرات'],['ov','🖼 ستيكر'],['audio','🎵 صوت'],['export','⬇ تصدير']];
 function renderTabs(){$('#tabs').innerHTML=TABS.map(([k,n])=>`<button data-t="${k}" class="${S.tab===k?'on':''}">${n}</button>`).join('')}
 $('#tabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.tab=b.dataset.t;renderTabs();renderPanel()};
-const obName=o=>o===DUCK?'duck':o===ENH?'enh':o===CARD?'card':o===BEAT?'beat':o===SIL?'sil':o===S.subStyle?'sty':S.sel&&S.sel.k||'';
+const obName=o=>o===VIZ?'viz':o===DUCK?'duck':o===ENH?'enh':o===CARD?'card':o===BEAT?'beat':o===SIL?'sil':o===S.subStyle?'sty':S.sel&&S.sel.k||'';
 function sld(o,k,label,min,max,step,unit=''){return`<div class="fld"><label>${label}<b>${o[k]}${unit}</b></label><input type="range" data-o="${obName(o)}" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${o[k]}" data-u="${unit}"></div>`}
 function sel_(o,k,label,opts){return`<div class="fld"><label>${label}</label><select data-o="${obName(o)}" data-k="${k}">${opts.map(([v,n])=>`<option value="${v}" ${String(o[k])===String(v)?'selected':''}>${n}</option>`).join('')}</select></div>`}
 function chk(o,k,label){return`<label class="chk"><input type="checkbox" data-o="${obName(o)}" data-k="${k}" ${o[k]?'checked':''}> ${label}</label>`}
@@ -471,7 +480,7 @@ function panelAudio(){
   const u=S.sel&&S.sel.k==='audio'?selObj():null;
   const auds=Object.values(assets).filter(a=>a.type==='audio');
   let h=`<div class="row"><button class="primary" data-act="add">+ ملف صوت / موسيقى</button><button id="recBtn">${rec.on?'⏹ إيقاف التسجيل':'🎤 تسجيل تعليق صوتي'}</button></div>`;
-  h+=`<p class="hint">التعليق الصوتي بيتسجل من الميكروفون وبيتحط عند مكان المؤشر.</p><div class="h4">🎚 تحسين الصوت</div>${chk(ENH,'on','تحسين الكلام (قص الدندنة + ضغط + رفع الصوت)')}${sld(ENH,'vol','مستوى الصوت الكلي',20,200,1,'%')}${chk(DUCK,'on','🎙 خفض الموسيقى تلقائي لما الفيديو فيه كلام')}${DUCK.on?sld(DUCK,'lvl','مستوى الموسيقى أثناء الكلام',5,80,1,'%'):''}`;
+  h+=`<p class="hint">التعليق الصوتي بيتسجل من الميكروفون وبيتحط عند مكان المؤشر.</p><div class="h4">🎚 تحسين الصوت</div>${chk(ENH,'on','تحسين الكلام (قص الدندنة + ضغط + رفع الصوت)')}${sld(ENH,'vol','مستوى الصوت الكلي',20,200,1,'%')}<div class="h4">📊 مرئي الصوت (Visualizer)</div>${chk(VIZ,'on','اظهر موجات الصوت فوق الفيديو (وتتصدّر)')}${VIZ.on?sel_(VIZ,'st','الشكل',[['bars','أعمدة'],['wave','موجة'],['circle','دايرة']])+clr(VIZ,'color','اللون')+sld(VIZ,'pos','الموضع',20,98,1,'%')+sld(VIZ,'size','الحجم',5,40,1,'%'):''}${chk(DUCK,'on','🎙 خفض الموسيقى تلقائي لما الفيديو فيه كلام')}${DUCK.on?sld(DUCK,'lvl','مستوى الموسيقى أثناء الكلام',5,80,1,'%'):''}`;
   h+=auds.map(a=>`<div class="subitem"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>🎵 ${esc(a.name)} · ${fmtS(a.dur)}</span><button data-act="aud" data-id="${a.id}">+ عند المؤشر</button></div></div>`).join('');
   if(auds.length){if(!BEAT.mus||!assets[BEAT.mus])BEAT.mus=auds[0].id;
     h+=`<div class="h4">🥁 مونتاج تلقائي على إيقاع الموسيقى</div><p class="hint">بيحلل إيقاع الموسيقى ويقطّع مقاطعك (اللي في الخط الزمني) ويرتبها على الضرب. تقدر تتراجع بـ Ctrl+Z.</p>${sel_(BEAT,'mus','الموسيقى',auds.map(a=>[a.id,a.name]))}${sel_(BEAT,'n','القطع كل',[[1,'ضربة'],[2,'ضربتين'],[4,'٤ ضربات'],[8,'٨ ضربات']])}<div class="row"><button class="primary" data-act="beatedit" id="beatBtn">🥁 ابدأ المونتاج التلقائي</button></div>`}
@@ -500,6 +509,7 @@ function wirePanel(B){
   $$('[data-k]',B).forEach(el=>{
     const ob=el.dataset.o,k=el.dataset.k;if(ob==='sil'){el.addEventListener('input',()=>{SIL[k]=parseFloat(el.value);const b=el.previousElementSibling&&$('b',el.previousElementSibling);if(b)b.textContent=SIL[k]+(el.dataset.u||'')});return}
     if(ob==='pv'){el.addEventListener('change',()=>{quality=+el.value;setCanvasSize(quality);dirty=true;toast('جودة المعاينة '+quality+'p')});return}
+    if(ob==='viz'){const h=()=>{VIZ[k]=el.type==='checkbox'?el.checked:el.type==='range'?parseFloat(el.value):el.value;dirty=true};el.addEventListener('input',h);el.addEventListener('change',()=>{h();if(el.tagName==='SELECT'||el.type==='checkbox')renderPanel()});return}
     if(ob==='duck'){const h=()=>{DUCK[k]=el.type==='checkbox'?el.checked:parseFloat(el.value);const b=el.previousElementSibling&&$('b',el.previousElementSibling);if(b&&el.type==='range')b.textContent=DUCK[k]+'%'};el.addEventListener('input',h);el.addEventListener('change',h);return}
     if(ob==='enh'){el.addEventListener('input',()=>{ENH[k]=el.type==='checkbox'?el.checked:parseFloat(el.value);applyEnh();const b=el.previousElementSibling&&$('b',el.previousElementSibling);if(b&&el.type==='range')b.textContent=ENH[k]+'%'});el.addEventListener('change',()=>{ENH[k]=el.type==='checkbox'?el.checked:parseFloat(el.value);applyEnh()});return}
     if(ob==='card'){el.addEventListener('input',()=>{CARD[k]=el.type==='number'||k==='st'?+el.value:el.value});return}
