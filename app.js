@@ -10,7 +10,7 @@ const FONT='Cairo,Tajawal,"Noto Sans Arabic",Arial,sans-serif';
 const PRESETS={none:{n:'بدون'},bw:{n:'أبيض وأسود',g:100},sepia:{n:'سيبيا',sp:85},vivid:{n:'حيوي',s:150,c:115},cool:{n:'بارد',h:-20,s:115,b:102},warm:{n:'دافئ',h:14,s:115,sp:15},vintage:{n:'قديم',sp:45,c:90,b:105,s:80},fade:{n:'باهت',c:80,b:115,s:75},drama:{n:'درامي',c:145,s:110,b:88},noir:{n:'نوار',g:100,c:150,b:90},neon:{n:'نيون',h:-40,s:190,c:120},invert:{n:'معكوس',inv:100}};
 const S={aspect:'16:9',clips:[],texts:[],subs:[],audios:[],overlays:[],subStyle:{size:5.4,color:'#ffffff',bg:true,pos:88,burn:true},playhead:0,sel:null,tab:'media',pps:50};
 const assets={};
-const SIL={th:-38,min:.5};let keyPick=false;
+const SIL={th:-38,min:.5},BEAT={n:2,mus:''};let keyPick=false;
 let total=0, dirty=true, quality=IS_MOBILE?540:720;
 const cv=$('#cv'), cx=cv.getContext('2d');
 
@@ -335,7 +335,7 @@ cv.addEventListener('pointerup',()=>{if(cdrag){cdrag=null;commit()}});
 const TABS=[['media','📁 الوسائط'],['text','🔤 نص'],['subs','💬 ترجمة'],['fx','✨ مؤثرات'],['ov','🖼 ستيكر'],['audio','🎵 صوت'],['export','⬇ تصدير']];
 function renderTabs(){$('#tabs').innerHTML=TABS.map(([k,n])=>`<button data-t="${k}" class="${S.tab===k?'on':''}">${n}</button>`).join('')}
 $('#tabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.tab=b.dataset.t;renderTabs();renderPanel()};
-const obName=o=>o===SIL?'sil':o===S.subStyle?'sty':S.sel&&S.sel.k||'';
+const obName=o=>o===BEAT?'beat':o===SIL?'sil':o===S.subStyle?'sty':S.sel&&S.sel.k||'';
 function sld(o,k,label,min,max,step,unit=''){return`<div class="fld"><label>${label}<b>${o[k]}${unit}</b></label><input type="range" data-o="${obName(o)}" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${o[k]}" data-u="${unit}"></div>`}
 function sel_(o,k,label,opts){return`<div class="fld"><label>${label}</label><select data-o="${obName(o)}" data-k="${k}">${opts.map(([v,n])=>`<option value="${v}" ${String(o[k])===String(v)?'selected':''}>${n}</option>`).join('')}</select></div>`}
 function chk(o,k,label){return`<label class="chk"><input type="checkbox" data-o="${obName(o)}" data-k="${k}" ${o[k]?'checked':''}> ${label}</label>`}
@@ -390,6 +390,7 @@ function panelFx(){
   h+=`<div class="h4">ضبط الصورة</div>${sld(c,'b','السطوع',30,200,1,'%')}${sld(c,'c','التباين',30,200,1,'%')}${sld(c,'s','التشبع',0,250,1,'%')}${sld(c,'h','تدرج اللون',-180,180,1,'°')}${sld(c,'bl','تمويه',0,20,.5,'px')}${chk(c,'vig','تعتيم الأطراف')}`;
   h+=`<div class="h4">🟩 إزالة الخلفية الخضراء (Chroma Key)</div>${chk(c,'key','فعّل إزالة الخلفية')}<div class="row"><button data-act="pickkey" id="pickKeyBtn">🎯 اختار اللون من الشاشة</button></div>${clr(c,'keyc','لون الخلفية اللي هتتشال')}${sld(c,'keyt','قوة الإزالة',5,90,1)}${sld(c,'keys','نعومة الحواف',1,40,1)}${sel_(c,'keybg','الخلفية البديلة',[['color','لون ثابت'],['grad','تدرج'],['image','صورة من الوسائط']])}${c.keybg==='color'||!c.keybg?clr(c,'keybgc','لون الخلفية البديلة'):''}${c.keybg==='image'?sel_(c,'keyaid','الصورة',[['','— اختار —']].concat(Object.values(assets).filter(x=>x.type==='image').map(x=>[x.id,x.name]))):''}<p class="hint">صوّر قدام ستارة خضراء، فعّل الخيار، واضغط "اختار اللون" وبعدين اضغط على الأخضر في الشاشة.</p>`;
   if(a.type==='video')h+=`<div class="h4">✂ حذف الصمت تلقائي</div><p class="hint">بيقطع الفترات الساكتة من المقطع ويسيب الكلام بس.</p>${sld(SIL,'th','حساسية الصوت (dB)',-60,-20,1)}${sld(SIL,'min','أقل مدة صمت تتحذف',.2,2,.05,'s')}<div class="row"><button class="primary" data-act="unsilence" id="silBtn">✂ احذف الصمت</button></div>`;
+  if(a.type==='video')h+=`<div class="row" style="margin-top:10px"><button data-act="freeze">❄ تجميد اللقطة عند المؤشر (٢ث)</button></div>`;
   h+=`<div class="h4">انتقال عند بداية المقطع</div><div class="presets" style="grid-template-columns:repeat(3,1fr)">${[['none','بدون'],['fade','تلاشي'],['dip','عبر الأسود'],['slide','انزلاق'],['wipe','مسح'],['zoom','زووم']].map(([v,n])=>`<button data-act="trans" data-v="${v}" class="${(c.trans||'none')===v?'on':''}" style="padding:10px 4px">${n}</button>`).join('')}</div>${c.trans&&c.trans!=='none'?sld(c,'transD','مدة الانتقال',.2,1.5,.1,'s'):''}<p class="hint">الانتقال بيظهر بين المقطع ده والمقطع اللي قبله.</p><div class="h4">الحركة والإطار</div><div class="row"><button data-act="rot">⟳ لف ٩٠°</button><button data-act="flip" class="${c.flip?'on':''}">⇋ قلب</button></div>${sel_(c,'fit','ملء الشاشة',[['contain','احتواء'],['cover','قص وملء']])}${chk(c,'bgblur','خلفية ضبابية لو فيه فراغ')}${sld(c,'zoom','تكبير',100,300,1,'%')}${sld(c,'kb','تكبير تدريجي (Ken Burns)',0,60,1,'%')}${sld(c,'px','إزاحة أفقية',-50,50,1,'%')}${sld(c,'py','إزاحة رأسية',-50,50,1,'%')}${sld(c,'fade','دخول/خروج تدريجي من الأسود',0,2,.1,'s')}`;
   if(a.type==='video')h+=`<div class="h4">سرعة وصوت</div>${sld(c,'speed','السرعة',.25,4,.05,'×')}${sld(c,'vol','مستوى الصوت',0,100,1,'%')}${chk(c,'mute','كتم صوت المقطع')}`;
   else h+=`<div class="h4">المدة</div><div class="fld"><label>مدة الصورة (ثانية)</label><input type="number" step="0.5" min="0.5" max="120" data-o="clip" data-k="out" value="${c.out}"></div>`;
@@ -419,6 +420,8 @@ function panelAudio(){
   let h=`<div class="row"><button class="primary" data-act="add">+ ملف صوت / موسيقى</button><button id="recBtn">${rec.on?'⏹ إيقاف التسجيل':'🎤 تسجيل تعليق صوتي'}</button></div>`;
   h+=`<p class="hint">التعليق الصوتي بيتسجل من الميكروفون وبيتحط عند مكان المؤشر.</p>`;
   h+=auds.map(a=>`<div class="subitem"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>🎵 ${esc(a.name)} · ${fmtS(a.dur)}</span><button data-act="aud" data-id="${a.id}">+ عند المؤشر</button></div></div>`).join('');
+  if(auds.length){if(!BEAT.mus||!assets[BEAT.mus])BEAT.mus=auds[0].id;
+    h+=`<div class="h4">🥁 مونتاج تلقائي على إيقاع الموسيقى</div><p class="hint">بيحلل إيقاع الموسيقى ويقطّع مقاطعك (اللي في الخط الزمني) ويرتبها على الضرب. تقدر تتراجع بـ Ctrl+Z.</p>${sel_(BEAT,'mus','الموسيقى',auds.map(a=>[a.id,a.name]))}${sel_(BEAT,'n','القطع كل',[[1,'ضربة'],[2,'ضربتين'],[4,'٤ ضربات'],[8,'٨ ضربات']])}<div class="row"><button class="primary" data-act="beatedit" id="beatBtn">🥁 ابدأ المونتاج التلقائي</button></div>`}
   if(u){const a=assets[u.aid]||{};h+=`<div class="h4">${esc(a.name||'')}</div>${sld(u,'vol','مستوى الصوت',0,100,1,'%')}${sld(u,'fi','دخول تدريجي',0,5,.1,'s')}${sld(u,'fo','خروج تدريجي',0,5,.1,'s')}<div class="fld"><label>يبدأ عند (ث)</label><input type="number" step="0.1" min="0" data-o="audio" data-k="start" value="${u.start.toFixed(1)}"></div>`}
   else h+=`<p class="hint">اختار مقطع صوت من الخط الزمني عشان تعدل مستواه.</p>`;
   return h;
@@ -443,6 +446,7 @@ function panelExport(){
 function wirePanel(B){
   $$('[data-k]',B).forEach(el=>{
     const ob=el.dataset.o,k=el.dataset.k;if(ob==='sil'){el.addEventListener('input',()=>{SIL[k]=parseFloat(el.value);const b=el.previousElementSibling&&$('b',el.previousElementSibling);if(b)b.textContent=SIL[k]+(el.dataset.u||'')});return}
+    if(ob==='beat'){el.addEventListener('change',()=>{BEAT[k]=k==='n'?+el.value:el.value});return}
     const target=()=>ob==='sil'?SIL:ob==='sty'?S.subStyle:ob==='proj'?S:ob==='exp'?exp:findObj(ob,S.sel&&S.sel.id);
     const val=()=>el.type==='checkbox'?el.checked:(el.type==='range'||el.type==='number')?parseFloat(el.value):(k==='weight'||k==='short'||k==='fps')?+el.value:el.value;
     el.addEventListener('input',()=>{const o=target();if(!o||ob==='proj'||ob==='exp')return;
@@ -470,6 +474,8 @@ function wirePanel(B){
     else if(act==='trans'){const c=selObj();c.trans=b.dataset.v;commit();renderPanel();dirty=true}
     else if(act==='pickkey'){keyPick=true;b.textContent='👆 دوس على اللون الأخضر في الشاشة...';b.classList.add('on');toast('دوس على الخلفية الخضراء في معاينة الفيديو')}
     else if(act==='unsilence')removeSilence();
+    else if(act==='beatedit')beatEdit();
+    else if(act==='freeze')freezeFrame();
     else if(act==='addtext')addText();
     else if(act==='preset'){const n=b.dataset.n,x=addText();x.size=+b.dataset.s;x.text=n==='عنوان كبير'?'العنوان هنا':n==='اسم / تعريف'?'الاسم · الوظيفة':'نص عادي';x.y=n==='اسم / تعريف'?.86:.5;commit();refreshAll()}
     else if(act==='addsub')addSub();
@@ -608,6 +614,57 @@ async function demo(){
   S.texts.push({id:uid(),text:'مونتاج وترجمة وتصدير على جهازك',start:3.4,end:6,x:.5,y:.5,size:7,color:'#ffe27a',bgOn:true,bg:'#00000099',anim:'slide',weight:700});
   S.subs=[{id:uid(),s:.5,e:3,t:'ده مثال للترجمة التلقائية'},{id:uid(),s:3.2,e:6,t:'تقدر تعدّل أي سطر بسهولة'},{id:uid(),s:6.2,e:9,t:'وتصدّر الفيديو كامل بضغطة'}];
   S.sel=null;S.tab='media';commit();refreshAll();seekTo(1);
+}
+
+/* ---------- beat sync + freeze frame ---------- */
+async function detectBeats(a){
+  const ac=new (window.OfflineAudioContext||window.webkitOfflineAudioContext)(1,1,22050);
+  const buf=await ac.decodeAudioData(await a.file.arrayBuffer());const d=buf.getChannelData(0),sr=buf.sampleRate,hop=512,nf=Math.floor(d.length/hop);
+  const e=new Float32Array(nf);for(let i=0;i<nf;i++){let x=0;for(let j=0;j<hop;j++){const v=d[i*hop+j];x+=v*v}e[i]=Math.sqrt(x/hop)}
+  const on=new Float32Array(nf);for(let i=1;i<nf;i++){let m=0,c=0;for(let k=Math.max(0,i-8);k<i;k++){m+=e[k];c++}on[i]=Math.max(0,e[i]-m/Math.max(1,c))}
+  const fps=sr/hop,lo=Math.round(fps*60/190),hi=Math.round(fps*60/70);let bl=lo,bs=-1;
+  const ac2=L=>{let sc=0;for(let i=L;i<nf;i++)sc+=on[i]*on[i-L];return sc/Math.sqrt(L/lo)};
+  for(let L=lo;L<=hi;L++){const sc=ac2(L);if(sc>bs){bs=sc;bl=L}}
+  let Lf=bl;if(bl>lo&&bl<hi){const y0=ac2(bl-1),y1=bs,y2=ac2(bl+1),dn=y0-2*y1+y2;if(dn<0)Lf=bl+.5*(y0-y2)/dn}
+  const grid=(p,k)=>p+k*Lf,sumAt=p=>{let sc=0;for(let k=0;grid(p,k)<nf-1;k++){const x=grid(p,k),i=Math.floor(x),f=x-i;sc+=on[i]*(1-f)+on[i+1]*f}return sc};
+  let bp=0,bps=-1;for(let p=0;p<Lf;p+=.5){const sc=sumAt(p);if(sc>bps){bps=sc;bp=p}}
+  const beats=[];for(let k=0;grid(bp,k)<nf;k++)beats.push(grid(bp,k)/fps);
+  return{bpm:60*fps/Lf,beats,dur:buf.duration};
+}
+async function beatEdit(){
+  const mus=assets[BEAT.mus];if(!mus){toast('ضيف موسيقى الأول');return}
+  const pool=S.clips.filter(c=>assets[c.aid]);if(!pool.length){toast('ضيف مقاطع أو صور الأول');return}
+  const btn=$('#beatBtn');if(btn){btn.disabled=true;btn.textContent='بحلل الإيقاع...'}
+  try{
+    const r=await detectBeats(mus);const n=BEAT.n||2;
+    if(r.beats.length<n+2)throw new Error('few');
+    const cuts=[];for(let i=0;i<r.beats.length;i+=n)cuts.push(r.beats[i]);
+    const end=Math.min(r.dur,Math.max(cuts[cuts.length-1],r.dur));cuts[0]=0;cuts.push(end);
+    const used=pool.map(()=>0),out=[];
+    for(let i=0;i<cuts.length-1;i++){
+      const dur=cuts[i+1]-cuts[i];if(dur<.25)continue;const k=i%pool.length,src=pool[k],a=assets[src.aid];
+      const nc=Object.assign({},src,{id:uid(),trans:'none',fade:0});
+      if(a.type==='video'){const span=src.out-src.in,room=Math.max(0,span-dur*src.speed);const off=room>0?(used[k]%Math.ceil(span/(dur*src.speed)))*dur*src.speed%Math.max(.01,room+.01):0;
+        nc.in=src.in+Math.min(room,off);nc.out=Math.min(src.out,nc.in+dur*src.speed)}
+      else{nc.in=0;nc.out=dur}
+      used[k]++;out.push(nc);
+    }
+    S.clips=out;S.audios=S.audios.filter(u=>u.aid!==mus.id);S.audios.push({id:uid(),aid:mus.id,start:0,in:0,out:Math.min(mus.dur,end),vol:100,fi:0,fo:0});
+    S.sel=null;layout();commit();refreshAll();seekTo(0);
+    toast('اتعمل مونتاج: '+Math.round(r.bpm)+' BPM، '+out.length+' قطعة ✅',5000);
+  }catch(e){toast('معرفتش أحلل إيقاع الملف ده')}
+  const b2=$('#beatBtn');if(b2){b2.disabled=false;b2.textContent='🥁 ابدأ المونتاج التلقائي'}
+}
+async function freezeFrame(){
+  const c=selObj(),i=S.clips.indexOf(c),a=c&&assets[c.aid];if(!a||a.type!=='video')return;
+  const t=S.playhead;if(clipAt(t)!==i){toast('حط المؤشر على المقطع المحدد');return}
+  const [w,h]=dims(Math.max(quality,720)),cvs=document.createElement('canvas');cvs.width=w;cvs.height=h;const x=cvs.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,w,h);
+  drawClipLayer(x,Object.assign({},c,{fade:0}),a,w,h,t);
+  const blob=await new Promise(r=>cvs.toBlob(r,'image/png'));const f=new File([blob],'freeze-'+fmt(t)+'.png',{type:'image/png'});
+  const ia=await loadAsset(f,'image');const lt=t-c._s,sp=c.in+lt*c.speed;
+  const fr=Object.assign(defClip(ia.id),{out:2,fit:'contain',bgblur:false,vol:0,preset:c.preset,b:c.b,c:c.c,s:c.s,h:c.h});
+  if(lt>.1&&cdur(c)-lt>.1){const n=Object.assign({},c,{id:uid(),in:sp,fade:0,trans:'none'});c.out=sp;S.clips.splice(i+1,0,fr,n)}else S.clips.splice(lt<=.1?i:i+1,0,fr);
+  S.sel={k:'clip',id:fr.id};layout();commit();refreshAll();seekTo(fr._s+.1);toast('اتجمّدت اللقطة ❄️');
 }
 
 /* ---------- silence removal ---------- */
