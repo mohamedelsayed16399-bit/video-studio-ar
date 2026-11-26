@@ -128,11 +128,12 @@ const bgc=document.createElement('canvas');
 const snapC=document.createElement('canvas'),tmpC=document.createElement('canvas');let snapInfo={ci:-9,w:0};
 const FXS={none:'بدون',shake:'اهتزاز',pulse:'نبض',glitch:'جليتش',vhs:'VHS قديم',grain:'حُبيبات فيلم',bars:'شريط سينمائي',flash:'وميض'};
 const rnd=(a,b)=>{const x=Math.sin(a*127.1+b*311.7)*43758.5453;return x-Math.floor(x)};
-let grainC=null;
+let grainC=null,_fxC=null;
+function fxCopy(ctx,w,h){if(!_fxC)_fxC=document.createElement('canvas');if(_fxC.width!==w||_fxC.height!==h){_fxC.width=w;_fxC.height=h}const x=_fxC.getContext('2d');x.clearRect(0,0,w,h);x.drawImage(ctx.canvas,0,0);return _fxC}
 function postFx(ctx,c,w,h,lt){
   const f=c.fx;if(!f||f==='none')return;const fr=Math.floor(lt*24),k=(c.fxs==null?60:c.fxs)/100;
   if(f==='glitch'){
-    const on=rnd(fr>>1,3)<.45*k+.1;if(!on)return;const cp=document.createElement('canvas');cp.width=w;cp.height=h;cp.getContext('2d').drawImage(ctx.canvas,0,0);
+    const on=rnd(fr>>1,3)<.45*k+.1;if(!on)return;const cp=fxCopy(ctx,w,h);
     const n=3+Math.floor(rnd(fr,1)*5);for(let i=0;i<n;i++){const y=rnd(fr,i)*h,bh=h*(.02+rnd(fr,i+9)*.08),dx=(rnd(fr,i+5)-.5)*w*.12*k*2;ctx.drawImage(cp,0,y,w,bh,dx,y,w,bh)}
     ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=.55;const o=w*.012*(.5+k);ctx.drawImage(cp,o,0);ctx.fillStyle='rgba(255,0,60,.0)';ctx.restore();
     ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.25;ctx.drawImage(cp,-o,0);ctx.restore();
@@ -140,7 +141,7 @@ function postFx(ctx,c,w,h,lt){
     ctx.save();ctx.fillStyle='rgba(0,0,0,'+(.1+.15*k)+')';for(let y=0;y<h;y+=Math.max(3,h/180|0)*2)ctx.fillRect(0,y,w,Math.max(1.5,h/360));
     const by=((lt*.25)%1)*h;ctx.fillStyle='rgba(255,255,255,.07)';ctx.fillRect(0,by,w,h*.06);
     ctx.globalCompositeOperation='screen';ctx.fillStyle='rgba(60,0,90,.12)';ctx.fillRect(0,0,w,h);ctx.restore();
-    const cp=document.createElement('canvas');cp.width=w;cp.height=h;cp.getContext('2d').drawImage(ctx.canvas,0,0);ctx.save();ctx.globalAlpha=.4;ctx.drawImage(cp,w*.004*(1+k)+rnd(fr,2)*w*.004,0);ctx.restore();
+    const cp=fxCopy(ctx,w,h);ctx.save();ctx.globalAlpha=.4;ctx.drawImage(cp,w*.004*(1+k)+rnd(fr,2)*w*.004,0);ctx.restore();
   }else if(f==='grain'){
     if(!grainC){grainC=document.createElement('canvas');grainC.width=grainC.height=160;const g=grainC.getContext('2d'),im=g.createImageData(160,160);for(let i=0;i<im.data.length;i+=4){const v=Math.random()*255;im.data[i]=im.data[i+1]=im.data[i+2]=v;im.data[i+3]=255}g.putImageData(im,0,0)}
     ctx.save();ctx.globalAlpha=.08+.22*k;ctx.globalCompositeOperation='overlay';const ox=-rnd(fr,4)*160,oy=-rnd(fr,5)*160,sc=Math.max(1,w/640);for(let x=ox;x<w;x+=160*sc)for(let y=oy;y<h;y+=160*sc)ctx.drawImage(grainC,x,y,160*sc,160*sc);ctx.restore();
@@ -169,7 +170,7 @@ function drawKeyed(ctx,c,a,w,h,t){
     let al=q<=t2?0:q>=e2?1:(Math.sqrt(q)-tol)/soft;
     d[i]=d[i+1]=d[i+2]=0;d[i+3]=a0*al;
   }
-  mx.putImageData(im,0,0);kx.save();kx.globalCompositeOperation='destination-in';kx.imageSmoothingEnabled=true;kx.imageSmoothingQuality='high';kx.drawImage(mC,0,0,w,h);kx.restore();
+  mx.putImageData(im,0,0);kx.save();kx.globalCompositeOperation='destination-in';kx.imageSmoothingEnabled=true;kx.imageSmoothingQuality='medium';kx.drawImage(mC,0,0,w,h);kx.restore();
   const bga=c.keybg==='image'&&assets[c.keyaid];
   if(bga&&bga.img){const k=Math.max(w/bga.w,h/bga.h);ctx.drawImage(bga.img,(w-bga.w*k)/2,(h-bga.h*k)/2,bga.w*k,bga.h*k)}
   else if(c.keybg==='grad'){const g=ctx.createLinearGradient(0,0,w,h);g.addColorStop(0,'#7c5cff');g.addColorStop(1,'#19d3c5');ctx.fillStyle=g;ctx.fillRect(0,0,w,h)}
