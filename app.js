@@ -397,6 +397,7 @@ function panelMedia(){
   return`<div class="row"><button class="primary" data-act="add">+ إضافة ملفات</button><button data-act="demo">مثال جاهز</button></div>
   <p class="hint">فيديو، صور، أو صوت. اضغط "+ للمقاطع" لإضافة الملف في الخط الزمني.</p>
   <div class="assets">${list.map(a=>`<div class="asset"><div class="th" style="${a.thumb?`background-image:url(${a.thumb})`:''}">${a.thumb?'':'🎵'}</div><div class="nm" title="${esc(a.name)}">${esc(a.name)}${a.type!=='image'?' · '+fmtS(a.dur):''}</div>${a.type==='audio'?`<button data-act="aud" data-id="${a.id}">+ كصوت</button>`:`<button data-act="clip" data-id="${a.id}">+ للمقاطع</button><button data-act="ov" data-id="${a.id}">${a.type==='image'?'+ ستيكر/لوجو':'+ PIP'}</button>`}</div>`).join('')||'<p class="hint">لسه مفيش ملفات.</p>'}</div>
+  <div class="h4">⚡ ستايلات جاهزة بضغطة (على كل المقاطع)</div><div class="row" style="display:grid;grid-template-columns:1fr 1fr">${PACKS.map((k,i)=>`<button data-act="pack" data-i="${i}">${k.n}</button>`).join('')}</div><p class="hint">بتغيّر الفلتر والمؤثرات والمقاس والترجمة مرة واحدة. تقدر تتراجع بـ Ctrl+Z.</p>
   <div class="h4">اختصارات</div><p class="hint">مسافة: تشغيل · S: قص · Delete: حذف · ←/→: إطار · Ctrl+Z: تراجع</p>`;
 }
 function panelText(){
@@ -526,6 +527,7 @@ function wirePanel(B){
     else if(act==='flip'){const c=selObj();c.flip=!c.flip;commit();renderPanel();dirty=true}
     else if(act==='trans'){const c=selObj();c.trans=b.dataset.v;commit();renderPanel();dirty=true}
     else if(act==='pickkey'){keyPick=true;b.textContent='👆 دوس على اللون الأخضر في الشاشة...';b.classList.add('on');toast('دوس على الخلفية الخضراء في معاينة الفيديو')}
+    else if(act==='pack')applyPack(+b.dataset.i);
     else if(act==='mask'){const c=selObj();c.mask=b.dataset.v;if(c.msz==null)c.msz=80;if(c.mx==null)c.mx=0;if(c.my==null)c.my=0;commit();renderPanel();dirty=true}
     else if(act==='fx'){const c=selObj();c.fx=b.dataset.v;if(c.fxs==null)c.fxs=60;commit();renderPanel();dirty=true}
     else if(act==='unsilence')removeSilence();
@@ -673,6 +675,14 @@ async function demo(){
   S.sel=null;S.tab='media';commit();refreshAll();seekTo(1);
 }
 
+const PACKS=[
+ {n:'📱 ريلز / تيك توك',aspect:'9:16',clip:{fit:'cover',preset:'vivid',fx:'none',zoom:105,kb:8},sub:{kar:true,khc:'#ffe14d',color:'#ffffff',bg:false,size:7,pos:76}},
+ {n:'🎞 سينمائي',aspect:'16:9',clip:{fit:'cover',preset:'drama',fx:'bars',fxs:55,temp:12,kb:6},sub:{kar:false,color:'#ffffff',bg:false,size:4.6,pos:88}},
+ {n:'📼 ريترو VHS',aspect:'4:3',clip:{fit:'cover',preset:'vintage',fx:'vhs',fxs:70,temp:20},sub:{kar:false,color:'#ffe14d',bg:false,size:5.2,pos:88}},
+ {n:'✨ نظيف ومشرق',aspect:'16:9',clip:{fit:'contain',preset:'vivid',fx:'none',b:105,c:105,temp:0},sub:{kar:false,color:'#ffffff',bg:true,size:5.4,pos:88}},
+ {n:'🔥 ديناميك',aspect:'9:16',clip:{fit:'cover',preset:'neon',fx:'pulse',fxs:50,kb:0},sub:{kar:true,khc:'#19d3c5',color:'#ffffff',bg:true,size:6.4,pos:80}},
+ {n:'⚪ إلغاء الستايل',aspect:null,clip:{preset:'none',fx:'none',temp:0,tint:0,b:100,c:100,s:100,h:0,bl:0,kb:0,zoom:100,vig:false},sub:{kar:false}}];
+function applyPack(i){const k=PACKS[i];if(!k)return;if(k.aspect){S.aspect=k.aspect;setCanvasSize(quality)}S.clips.forEach(c=>Object.assign(c,k.clip));Object.assign(S.subStyle,k.sub);commit();refreshAll();toast('اتطبق ستايل '+k.n.replace(/^\S+\s/,'')+' ✅')}
 /* ---------- title cards ---------- */
 const CARDS=[{n:'بنفسجي مضيء',a:'#7c5cff',b:'#19d3c5',sh:'circles'},{n:'غروب',a:'#ff512f',b:'#f09819',sh:'bars'},{n:'ليلي أنيق',a:'#0f0c29',b:'#302b63',sh:'lines',c:'#ffe14d'},{n:'أخضر طبيعة',a:'#11998e',b:'#38ef7d',sh:'circles'},{n:'أحمر درامي',a:'#cb2d3e',b:'#1d1d1d',sh:'bars'},{n:'أبيض بسيط',a:'#f5f5f7',b:'#dcdce6',sh:'lines',c:'#222233',dark:true}];
 async function addCard(where){
