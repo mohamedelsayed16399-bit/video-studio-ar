@@ -873,3 +873,62 @@ addEventListener('resize',()=>{renderTL();fitCanvas()});if(window.ResizeObserver
 if(document.fonts)document.fonts.load('700 20px Cairo').then(()=>{dirty=true}).catch(()=>{});
 window.__S=S;window.__assets=assets;window.__app={drawFrame,play,pause,seekTo,addText,splitAt,runExport,runASR,importFiles,demo};
 setCanvasSize(quality);commit();refreshAll();requestAnimationFrame(tick);checkSaved();
+
+/* ===== R19: project file export/import ===== */
+(function(){
+  function usedIds(){const u=new Set();S.clips.forEach(c=>{u.add(c.aid);if(c.keyaid)u.add(c.keyaid)});S.audios.forEach(x=>u.add(x.aid));S.overlays.forEach(o=>u.add(o.aid));return [...u].filter(i=>assets[i])}
+  async function exportProj(){
+    if(!S.clips.length&&!S.audios.length){toast('مفيش مشروع تحفظه');return}
+    const ids=usedIds(),meta=[],parts=[];
+    for(const id of ids){const a=assets[id];meta.push({id,type:a.type,name:a.name,dur:a.dur,size:a.file.size,mime:a.file.type});parts.push(a.file)}
+    const head=new TextEncoder().encode(JSON.stringify({v:1,state:snap(),assets:meta}));
+    const len=new Uint8Array(4);new DataView(len.buffer).setUint32(0,head.length);
+    const blob=new Blob([new TextEncoder().encode('VSP1'),len,head,...parts],{type:'application/octet-stream'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='project.vsproj';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    toast('اتحفظ ملف المشروع 💾');
+  }
+  async function importProj(file){
+    try{
+      const buf=await file.slice(0,8).arrayBuffer();
+      if(new TextDecoder().decode(buf.slice(0,4))!=='VSP1'){toast('ده مش ملف مشروع');return}
+      const hl=new DataView(buf).getUint32(4);
+      const head=JSON.parse(await file.slice(8,8+hl).text());
+      restoring=true;toast('برجّع المشروع...');
+      let off=8+hl;
+      for(const m of head.assets){const f=new File([file.slice(off,off+m.size,m.mime)],m.name,{type:m.mime});off+=m.size;await loadAsset(f,m.type,m.dur,m.id)}
+      const o=JSON.parse(head.state);Object.assign(S,{overlays:[]},o);S.sel=null;layout();S.playhead=0;setCanvasSize(quality);commit();refreshAll();seekTo(0);
+      restoring=false;autosave();toast('اتفتح المشروع ✅');
+    }catch(e){restoring=false;console.warn(e);toast('معرفتش أفتح الملف')}
+  }
+  const top=document.getElementById('top'),ex=document.getElementById('btnExport');
+  const bs=document.createElement('button');bs.className='ib';bs.id='projSave';bs.title='احفظ المشروع كملف';bs.textContent='💾';bs.onclick=exportProj;
+  const bo=document.createElement('button');bo.className='ib';bo.id='projOpen';bo.title='افتح ملف مشروع';bo.textContent='📂';
+  const fi=document.createElement('input');fi.type='file';fi.accept='.vsproj';fi.id='projIn';fi.hidden=true;fi.onchange=()=>{if(fi.files[0])importProj(fi.files[0]);fi.value=''};
+  bo.onclick=()=>fi.click();
+  top.insertBefore(bs,ex);top.insertBefore(bo,ex);top.appendChild(fi);
+  window.__proj={exportProj,importProj};
+})();
+
+/* ===== R20: shortcuts help + extra keys ===== */
+(function(){
+  const rows=[['Space','تشغيل / إيقاف'],['S','قص عند المؤشر'],['Delete','حذف المحدد'],['← / →','خطوة 0.1 ث (مع Shift: ثانية)'],['Home / End','أول / آخر المشروع'],['J / K','رجوع / تقدم 5 ثواني'],['Ctrl+Z / Y','تراجع / إعادة'],['?','الصفحة دي']];
+  function show(){
+    let d=document.getElementById('helpBox');if(d){d.remove();return}
+    d=document.createElement('div');d.id='helpBox';d.dir='rtl';
+    d.style.cssText='position:fixed;inset:0;background:#000a;z-index:99;display:flex;align-items:center;justify-content:center;padding:16px';
+    d.innerHTML='<div style="background:#1a1c26;border:1px solid #333;border-radius:14px;padding:18px 22px;max-width:420px;width:100%;color:#eee;font-family:inherit"><h3 style="margin:0 0 10px">اختصارات الكيبورد</h3>'+rows.map(r=>'<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #2a2d3a"><b dir="ltr" style="color:#7ee">'+r[0]+'</b><span>'+r[1]+'</span></div>').join('')+'<p style="margin:12px 0 0;font-size:13px;opacity:.7">كل حاجة بتشتغل على جهازك ومفيش رفع. المشروع بيتحفظ تلقائي، و💾 بتحفظه كملف.</p><button class="primary" style="margin-top:10px;width:100%" id="helpClose">تمام</button></div>';
+    d.onclick=e=>{if(e.target===d||e.target.id==='helpClose')d.remove()};document.body.appendChild(d);
+  }
+  const top=document.getElementById('top'),ex=document.getElementById('btnExport');
+  const b=document.createElement('button');b.className='ib';b.id='helpBtn';b.title='اختصارات ومساعدة (?)';b.textContent='❓';b.onclick=show;top.insertBefore(b,document.getElementById('undo'));
+  addEventListener('keydown',e=>{
+    const ae=document.activeElement;if(/INPUT|TEXTAREA|SELECT/.test(ae.tagName)&&ae.type!=='range'&&ae.type!=='checkbox')return;
+    if(e.key==='?'){show()}
+    else if(e.key==='Escape'){const d=document.getElementById('helpBox');if(d)d.remove()}
+    else if(e.key==='Home'){e.preventDefault();seekTo(0)}
+    else if(e.key==='End'){e.preventDefault();seekTo(total)}
+    else if(e.key==='j'||e.key==='J'){seekTo(S.playhead-5)}
+    else if(e.key==='k'||e.key==='K'){seekTo(S.playhead+5)}
+  });
+})();
+(function(){const st=document.createElement('style');st.textContent='@media(max-width:560px){#top{gap:4px;padding-left:6px;padding-right:6px}#top .brand{font-size:13px;white-space:nowrap}#top .brand .logo{display:none}#top .ib{min-width:34px;width:34px;padding:0}#btnExport{padding:8px 10px;white-space:nowrap;font-size:13px}}';document.head.appendChild(st)})();
