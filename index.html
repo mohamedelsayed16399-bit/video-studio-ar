@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1117">
+<title>استوديو الفيديو | مونتاج وترجمة تلقائية على جهازك</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="top">
+  <div class="brand"><span class="logo">▶</span> استوديو الفيديو</div>
+  <div class="sp"></div>
+  <button id="undo" class="ib" title="تراجع (Ctrl+Z)">↶</button>
+  <button id="redo" class="ib" title="إعادة (Ctrl+Y)">↷</button>
+  <button id="btnExport" class="primary">تصدير ⬇</button>
+</header>
+<main>
+  <section id="stage">
+    <div class="canvasWrap" id="cwrap">
+      <canvas id="cv" width="1280" height="720"></canvas>
+      <div id="empty">
+        <div class="big">🎬</div>
+        <p>اسحب فيديو أو صور أو صوت هنا، أو</p>
+        <button class="primary" id="emptyAdd">اختار ملفات</button>
+        <button id="emptyDemo">جرّب مثال جاهز</button>
+        <small>كل حاجة بتشتغل على جهازك. مفيش رفع ولا حساب.</small>
+      </div>
+    </div>
+    <div id="transport">
+      <button id="bStart" class="ib" title="البداية">⏮</button>
+      <button id="bPlay" class="ib play" title="تشغيل (مسافة)">▶</button>
+      <button id="bEnd" class="ib" title="النهاية">⏭</button>
+      <span id="tc">00:00.0 / 00:00.0</span>
+      <span class="sp"></span>
+      <button id="bSplit" class="tb" title="قص عند المؤشر (S)">✂ قص</button>
+      <button id="bDup" class="tb" title="نسخ المقطع">⧉</button>
+      <button id="bDel" class="tb danger" title="حذف (Delete)">🗑</button>
+    </div>
+  </section>
+  <aside id="panel">
+    <nav id="tabs"></nav>
+    <div id="tabBody"></div>
+  </aside>
+  <section id="tl">
+    <div class="tlbar">
+      <span>الخط الزمني</span>
+      <label class="zm">تكبير <input type="range" id="zoom" min="8" max="200" value="50"></label>
+    </div>
+    <div id="tlScroll" dir="ltr">
+      <div id="tlInner">
+        <div id="ruler"></div>
+        <div class="trk" id="trV" data-l="🎞"></div>
+        <div class="trk" id="trT" data-l="T"></div>
+        <div class="trk" id="trS" data-l="💬"></div>
+        <div class="trk" id="trA" data-l="🔊"></div>
+        <div id="playhead"><i></i></div>
+      </div>
+    </div>
+  </section>
+</main>
+<input type="file" id="fileIn" accept="video/*,image/*,audio/*" multiple hidden>
+<input type="file" id="srtIn" accept=".srt,.vtt,text/plain" hidden>
+<div id="toast"></div>
+<div id="drop">أفلت الملفات هنا</div>
+<script src="app.js"></script>
+</body>
+</html>
