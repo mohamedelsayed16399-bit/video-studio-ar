@@ -397,6 +397,7 @@ function panelMedia(){
   return`<div class="row"><button class="primary" data-act="add">+ إضافة ملفات</button><button data-act="demo">مثال جاهز</button></div>
   <p class="hint">فيديو، صور، أو صوت. اضغط "+ للمقاطع" لإضافة الملف في الخط الزمني.</p>
   <div class="assets">${list.map(a=>`<div class="asset"><div class="th" style="${a.thumb?`background-image:url(${a.thumb})`:''}">${a.thumb?'':'🎵'}</div><div class="nm" title="${esc(a.name)}">${esc(a.name)}${a.type!=='image'?' · '+fmtS(a.dur):''}</div>${a.type==='audio'?`<button data-act="aud" data-id="${a.id}">+ كصوت</button>`:`<button data-act="clip" data-id="${a.id}">+ للمقاطع</button><button data-act="ov" data-id="${a.id}">${a.type==='image'?'+ ستيكر/لوجو':'+ PIP'}</button>`}</div>`).join('')||'<p class="hint">لسه مفيش ملفات.</p>'}</div>
+  <div class="row" style="margin-top:8px"><button data-act="recvid" data-src="cam" class="${RV.on&&RV.src==='cam'?'on':''}">${RV.on&&RV.src==='cam'?'⏹ إيقاف التسجيل':'🎥 تسجيل بالكاميرا'}</button>${navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia&&!IS_MOBILE?`<button data-act="recvid" data-src="screen" class="${RV.on&&RV.src==='screen'?'on':''}">${RV.on&&RV.src==='screen'?'⏹ إيقاف التسجيل':'🖥 تسجيل الشاشة'}</button>`:''}</div>
   <div class="h4">⚡ ستايلات جاهزة بضغطة (على كل المقاطع)</div><div class="row" style="display:grid;grid-template-columns:1fr 1fr">${PACKS.map((k,i)=>`<button data-act="pack" data-i="${i}">${k.n}</button>`).join('')}</div><p class="hint">بتغيّر الفلتر والمؤثرات والمقاس والترجمة مرة واحدة. تقدر تتراجع بـ Ctrl+Z.</p>
   <div class="h4">اختصارات</div><p class="hint">مسافة: تشغيل · S: قص · Delete: حذف · ←/→: إطار · Ctrl+Z: تراجع</p>`;
 }
@@ -528,6 +529,7 @@ function wirePanel(B){
     else if(act==='trans'){const c=selObj();c.trans=b.dataset.v;commit();renderPanel();dirty=true}
     else if(act==='pickkey'){keyPick=true;b.textContent='👆 دوس على اللون الأخضر في الشاشة...';b.classList.add('on');toast('دوس على الخلفية الخضراء في معاينة الفيديو')}
     else if(act==='pack')applyPack(+b.dataset.i);
+    else if(act==='recvid')toggleRecVid(b.dataset.src);
     else if(act==='mask'){const c=selObj();c.mask=b.dataset.v;if(c.msz==null)c.msz=80;if(c.mx==null)c.mx=0;if(c.my==null)c.my=0;commit();renderPanel();dirty=true}
     else if(act==='fx'){const c=selObj();c.fx=b.dataset.v;if(c.fxs==null)c.fxs=60;commit();renderPanel();dirty=true}
     else if(act==='unsilence')removeSilence();
@@ -633,6 +635,21 @@ async function toggleRec(){
   }catch(e){toast('محتاج إذن الميكروفون')}
 }
 
+const RV={on:false,src:'',mr:null};
+async function toggleRecVid(src){
+  if(RV.on){RV.mr.stop();return}
+  try{
+    const st=src==='screen'?await navigator.mediaDevices.getDisplayMedia({video:true,audio:true}):await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:true});
+    const chunks=[],mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'].find(m=>MediaRecorder.isTypeSupported(m))||'';
+    RV.mr=new MediaRecorder(st,mime?{mimeType:mime}:undefined);RV.src=src;const t0=performance.now();
+    RV.mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+    st.getVideoTracks()[0].addEventListener('ended',()=>{if(RV.on&&RV.mr.state!=='inactive')RV.mr.stop()});
+    RV.mr.onstop=async()=>{st.getTracks().forEach(t=>t.stop());RV.on=false;const dur=(performance.now()-t0)/1000;
+      const ext=(RV.mr.mimeType||mime).includes('mp4')?'mp4':'webm';const f=new File(chunks,(src==='screen'?'تسجيل شاشة':'تسجيل كاميرا')+'.'+ext,{type:RV.mr.mimeType||mime||'video/webm'});
+      try{const a=await loadAsset(f,'video',dur);a.dur=dur;addClip(a.id);S.tab='media';renderTabs();renderPanel();toast('اتضاف التسجيل للمقاطع ✅')}catch(e){toast('فشل حفظ التسجيل');renderPanel()}};
+    RV.mr.start(1000);RV.on=true;renderPanel();toast('بيسجّل... اضغط إيقاف لما تخلص',4000);
+  }catch(e){toast(src==='screen'?'مفيش إذن لتسجيل الشاشة':'محتاج إذن الكاميرا والميكروفون')}
+}
 /* ---------- export ---------- */
 function showResult(){
   const el=$('#expRes');if(!el||!exp.result)return;
