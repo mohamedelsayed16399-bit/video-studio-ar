@@ -957,3 +957,57 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   function end(){try{localStorage.setItem('vs_tour','1')}catch(e){}d.remove()}
   setTimeout(()=>{if(window.__noTour)return;draw();document.body.appendChild(d)},900);
 })();
+
+/* ===== R26: GIF export (own encoder, offline frame stepping) ===== */
+(function(){
+  function gifEncode(frames,w,h,delayCs){
+    const out=[];const B=n=>out.push(n&255),W=n=>{B(n);B(n>>8)};
+    ['G','I','F','8','9','a'].forEach(c=>B(c.charCodeAt(0)));W(w);W(h);B(0xF7);B(0);B(0);
+    for(let i=0;i<256;i++){B(((i>>5)&7)*255/7|0);B(((i>>2)&7)*255/7|0);B((i&3)*255/3|0)}
+    B(0x21);B(0xFF);B(11);'NETSCAPE2.0'.split('').forEach(c=>B(c.charCodeAt(0)));B(3);B(1);W(0);B(0);
+    const bayer=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+    for(const px of frames){
+      B(0x21);B(0xF9);B(4);B(0);W(delayCs);B(0);B(0);
+      B(0x2C);W(0);W(0);W(w);W(h);B(0);
+      const idx=new Uint8Array(w*h);
+      for(let y=0,p=0;y<h;y++)for(let x=0;x<w;x++,p++){const o=p*4,t=(bayer[(y&3)*4+(x&3)]-7.5)*3;
+        const r=Math.max(0,Math.min(255,px[o]+t)),g=Math.max(0,Math.min(255,px[o+1]+t)),b=Math.max(0,Math.min(255,px[o+2]+t));
+        idx[p]=((r>>5)<<5)|((g>>5)<<2)|(b>>6)}
+      // LZW, min code size 8
+      const mc=8,clear=256,eoi=257;let bits=0,nb=0,cs=mc+1,next=258,dict=new Map();const bytes=[];
+      const put=(c)=>{bits|=c<<nb;nb+=cs;while(nb>=8){bytes.push(bits&255);bits>>=8;nb-=8}};
+      put(clear);let cur=idx[0];
+      for(let i=1;i<idx.length;i++){const k=idx[i],key=cur*256+k,v=dict.get(key);
+        if(v!==undefined){cur=v}else{put(cur);
+          if(next<4096){dict.set(key,next++);if(next>(1<<cs)&&cs<12)cs++}
+          else{put(clear);dict.clear();next=258;cs=mc+1}
+          cur=k}}
+      put(cur);put(eoi);if(nb>0)bytes.push(bits&255);
+      B(mc);for(let i=0;i<bytes.length;i+=255){const n=Math.min(255,bytes.length-i);B(n);for(let j=0;j<n;j++)out.push(bytes[i+j])}B(0);
+    }
+    B(0x3B);return new Blob([new Uint8Array(out)],{type:'image/gif'});
+  }
+  const waitSeek=el=>new Promise(r=>{if(!el.seeking)return r();const f=()=>{el.removeEventListener('seeked',f);r()};el.addEventListener('seeked',f);setTimeout(r,1500)});
+  async function exportGif(btn){
+    if(!S.clips.length){toast('ضيف مقاطع الأول');return}
+    pause();const fps=10,wid=480,[w0,h0]=dims(720);const w=wid,h=Math.round(wid*h0/w0/2)*2;
+    const dur=Math.min(total,15),n=Math.max(1,Math.floor(dur*fps));
+    const cv=document.createElement('canvas');cv.width=w;cv.height=h;const x=cv.getContext('2d',{willReadFrequently:true});
+    const frames=[],old=S.playhead;btn.disabled=true;
+    try{
+      for(let i=0;i<n;i++){
+        const t=i/fps,ci=clipAt(t),c=S.clips[ci],a=c&&assets[c.aid];
+        if(a&&a.type==='video'){a.el.pause();a.el.currentTime=srcTime(c,t);await waitSeek(a.el);await new Promise(r=>requestAnimationFrame(r))}
+        drawFrame(x,w,h,t);frames.push(new Uint8ClampedArray(x.getImageData(0,0,w,h).data));
+        if(i%3==0){btn.textContent='جاري عمل GIF... '+Math.round(i/n*100)+'%';await new Promise(r=>setTimeout(r,0))}
+      }
+      const blob=gifEncode(frames,w,h,Math.round(100/fps));
+      download(blob,'video.gif');toast('اتعمل GIF ('+(blob.size/1048576).toFixed(1)+' ميجا'+(total>15?'، أول 15 ثانية':'')+') ✅');window.__gifSize=blob.size;window.__gifBlob=blob;
+    }catch(e){console.warn(e);toast('معرفتش أعمل GIF')}
+    btn.disabled=false;btn.textContent='🎞 صدّر GIF';seekTo(old);
+  }
+  const orig=renderPanel;
+  renderPanel=function(){orig.apply(this,arguments);
+    if(S.tab==='export'){const sn=document.getElementById('snapBtn');if(sn&&!document.getElementById('gifBtn')){const b=document.createElement('button');b.id='gifBtn';b.textContent='🎞 صدّر GIF';b.style.cssText='width:100%;margin-top:8px';b.onclick=()=>exportGif(b);sn.after(b)}}};
+  window.__exportGif=exportGif;
+})();
