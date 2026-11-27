@@ -277,7 +277,8 @@ function drawFrame(ctx,w,h,t,opt={}){
   S.overlays.forEach(ov=>{
     if(t<ov.start||t>ov.end)return;const a=assets[ov.aid];if(!a||(!a.img&&a.type!=='video'))return;const vel=a.type==='video'?ovEl(ov):null;if(a.type==='video'&&(!vel||vel.readyState<2))return;const lt=t-ov.start,d=Math.max(.1,ov.end-ov.start);
     let al=ov.opacity/100,sc=1;if(ov.anim==='fade')al*=Math.min(1,lt/.4,(d-lt)/.4);else if(ov.anim==='pop'){sc=.5+.5*easeBack(Math.min(1,lt/.35));al*=Math.min(1,lt/.1,(d-lt)/.2)}else if(ov.anim==='float')sc=1+Math.sin(lt*3)*.04;
-    const dw=w*ov.size/100*sc,dh=dw*a.h/a.w;ctx.save();ctx.globalAlpha=clamp(al,0,1);ctx.translate(ov.x*w,ov.y*h);ctx.rotate((ov.rot||0)*Math.PI/180);if(ov.rad){rrect(ctx,-dw/2,-dh/2,dw,dh,Math.min(dw,dh)*ov.rad/100);ctx.save();ctx.clip()}ctx.drawImage(vel||a.img,-dw/2,-dh/2,dw,dh);if(ov.rad)ctx.restore();if(ov.bd){ctx.lineWidth=Math.max(1,dw*ov.bd/200);ctx.strokeStyle='#fff';if(ov.rad)rrect(ctx,-dw/2,-dh/2,dw,dh,Math.min(dw,dh)*ov.rad/100);else{ctx.beginPath();ctx.rect(-dw/2,-dh/2,dw,dh)}ctx.stroke()}ctx.restore();
+    const M=ov.mo?ovMotion(ov,lt,d):null;if(M){sc*=M.sc;al*=M.al}
+    const dw=w*ov.size/100*sc,dh=dw*a.h/a.w;ctx.save();ctx.globalAlpha=clamp(al,0,1);ctx.translate((ov.x+(M?M.dx:0))*w,(ov.y+(M?M.dy:0))*h);ctx.rotate(((ov.rot||0)+(M?M.rot:0))*Math.PI/180);if(ov.rad){rrect(ctx,-dw/2,-dh/2,dw,dh,Math.min(dw,dh)*ov.rad/100);ctx.save();ctx.clip()}ctx.drawImage(vel||a.img,-dw/2,-dh/2,dw,dh);if(ov.rad)ctx.restore();if(ov.bd){ctx.lineWidth=Math.max(1,dw*ov.bd/200);ctx.strokeStyle='#fff';if(ov.rad)rrect(ctx,-dw/2,-dh/2,dw,dh,Math.min(dw,dh)*ov.rad/100);else{ctx.beginPath();ctx.rect(-dw/2,-dh/2,dw,dh)}ctx.stroke()}ctx.restore();
   });
   if(VIZ.on&&ENHN.an)drawViz(ctx,w,h);
   S.texts.forEach(tx=>{
@@ -1968,6 +1969,42 @@ function drawKinetic(ctx,w,h,tx,lt,d){
         cvs.forEach((c,i)=>{const x=c.getContext('2d');x.clearRect(0,0,320,110);drawKinetic(x,320,110,{text:i%2?'KINETIC TEXT':SAMPLE,size:20,x:.5,y:.5,color:'#fff',weight:900,anim:KX[i][0],bgOn:false},T,3.4)});
         requestAnimationFrame(loop)};loop();
     }catch(e){console.error('kx',e)}
+    return r;
+  };
+})();
+/* ===== R74: motion paths for stickers / picture-in-picture ===== */
+const MO=[['in_l','⬅ يدخل من الشمال'],['in_r','➡ يدخل من اليمين'],['in_b','⬆ يطلع من تحت'],['in_t','⬇ ينزل من فوق'],['orbit','🌀 يدور'],['bounce','🏀 ينط'],['swing','🔔 تأرجح'],['pulse','💓 نبض'],['drift','↗ انجراف'],['spiral','🌪 لولب'],['shake','📳 هزّة'],['none','⛔ بدون حركة']];
+function ovMotion(ov,lt,d){
+  const m=ov.mo,cl=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));let dx=0,dy=0,rot=0,sc=1,al=1;
+  const fly=()=>Math.min(easeOut(cl(lt/.6)),easeOut(cl((d-lt)/.5)));
+  if(m==='in_l')dx=-(1-fly())*1.1;else if(m==='in_r')dx=(1-fly())*1.1;else if(m==='in_b')dy=(1-fly())*1.1;else if(m==='in_t')dy=-(1-fly())*1.1;
+  else if(m==='orbit'){const a=lt*2.2;dx=Math.cos(a)*.09;dy=Math.sin(a)*.09*1.6}
+  else if(m==='bounce'){const p=(lt*1.4)%1;dy=-Math.abs(Math.sin(p*Math.PI))*.16;sc=1+(p<.08||p>.92?.0:0)}
+  else if(m==='swing'){rot=Math.sin(lt*3)*18}
+  else if(m==='pulse'){const p=(lt*1.6)%1;sc=1+.14*Math.max(0,Math.sin(p*Math.PI*2))*(p<.5?1:.6)}
+  else if(m==='drift'){const k=cl(lt/d);dx=-.12+.24*k;dy=.06-.12*k;sc=1+.1*k}
+  else if(m==='spiral'){const p=easeOut(cl(lt/.9));rot=(1-p)*540;sc=p;al=cl(lt/.25)*cl((d-lt)/.25)}
+  else if(m==='shake'){const fr=Math.floor(lt*26);dx=(rnd(fr,3)-.5)*.02;dy=(rnd(fr,4)-.5)*.02;rot=(rnd(fr,5)-.5)*3}
+  return{dx,dy,rot,sc:Math.max(.001,sc),al};
+}
+(function(){
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='ov')return r;
+      const d=document.createElement('div');d.id='moBox';d.style.cssText='padding:4px 12px 14px';
+      const ov=S.sel&&S.sel.k==='ov'?selObj():null;
+      d.innerHTML='<div class="h4">🛤 مسارات حركة للستيكر / صورة داخل صورة</div><p class="hint">'+(ov?'اضغط حركة تتطبق على الستيكر المحدد (بتتراجع بـ Undo). المعاينة شغالة.':'اختار ستيكر الأول من الخط الزمني.')+'</p><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">'+
+        MO.map((k,i)=>'<button class="btn" data-mo="'+i+'" style="padding:4px;font-size:12px;'+(ov&&(ov.mo||'none')===k[0]?'outline:2px solid #7c5cff':'')+'"><canvas width="150" height="90" style="width:100%;border-radius:6px;background:#12151f;display:block;margin-bottom:3px"></canvas>'+k[1]+'</button>').join('')+'</div>';
+      B.appendChild(d);
+      const cvs=[...d.querySelectorAll('canvas')];
+      d.querySelectorAll('[data-mo]').forEach(b=>b.onclick=()=>{const v=selObj&&S.sel&&S.sel.k==='ov'?selObj():null;if(!v)return;const k=MO[+b.dataset.mo][0];if(k==='none')delete v.mo;else v.mo=k;commit();refreshAll();seekTo(Math.max(S.playhead,v.start))});
+      const t0=performance.now();
+      const loop=()=>{if(!d.isConnected)return;const T=((performance.now()-t0)/1000)%3;
+        cvs.forEach((c,i)=>{const x=c.getContext('2d');x.clearRect(0,0,150,90);const M=ovMotion({mo:MO[i][0]},T,3);const w=26*M.sc;x.save();x.globalAlpha=Math.max(0,Math.min(1,M.al));x.translate(75+M.dx*150,45+M.dy*90);x.rotate(M.rot*Math.PI/180);x.fillStyle='#7c5cff';x.fillRect(-w/2,-w/2*.7,w,w*.7);x.fillStyle='#fff';x.fillRect(-w/2+3,-w/2*.7+3,w*.35,w*.2);x.restore()});
+        requestAnimationFrame(loop)};loop();
+    }catch(e){console.error('mo',e)}
     return r;
   };
 })();
