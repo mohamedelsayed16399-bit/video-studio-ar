@@ -270,7 +270,7 @@ function drawFrame(ctx,w,h,t,opt={}){
   });
   if(opt.subs!==false&&S.subStyle.burn){
     const sub=S.subs.find(s=>t>=s.s&&t<=s.e);
-    if(sub&&sub.t)drawCaption(ctx,w,h,sub.t,w/2,S.subStyle.pos/100*h,S.subStyle.size,S.subStyle.color,S.subStyle.bg?'rgba(0,0,0,.62)':null,{clamp:true,weight:700,kar:S.subStyle.kar?{p:clamp((t-sub.s)/Math.max(.2,sub.e-sub.s),0,1),hc:S.subStyle.khc||'#ffe14d'}:null});
+    if(sub&&sub.t)drawCaption(ctx,w,h,sub.t,w/2,S.subStyle.pos/100*h,S.subStyle.size,S.subStyle.color,S.subStyle.bg?'rgba(0,0,0,.62)':null,{clamp:true,weight:700,stc:S.subStyle.stc,stw:S.subStyle.stw,glow:S.subStyle.glow,kar:S.subStyle.kar?{p:clamp((t-sub.s)/Math.max(.2,sub.e-sub.s),0,1),hc:S.subStyle.khc||'#ffe14d'}:null});
   }
   ctx.restore();
 }
@@ -1246,6 +1246,22 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
     d.querySelectorAll('[data-ts]').forEach(el=>el.addEventListener('input',()=>{const k=el.dataset.ts;
       if(k==='stw')tx.stw=+el.value;else if(k==='stc')tx.stc=el.value;
       else{const gc=d.querySelector('[data-ts="glow"]').value,on=d.querySelector('[data-ts="gon"]').checked;tx.glow=on?gc:null}
+      dirty=true;commit()}));
+  };
+})();
+
+/* ===== R44: subtitle outline + glow ===== */
+(function(){
+  const orig=renderPanel;
+  renderPanel=function(){orig.apply(this,arguments);
+    if(S.tab!=='subs')return;const B=document.getElementById('panel');if(!B||B.querySelector('#ssoBox'))return;
+    const Y=S.subStyle;
+    const d=document.createElement('div');d.id='ssoBox';d.style.cssText='padding:4px 12px 14px';
+    d.innerHTML='<div class="h4">🖍 حدود وتوهج الترجمة</div><div class="fld"><label>لون الحد</label><input type="color" data-so="stc" value="'+(Y.stc||'#000000')+'"></div><div class="fld"><label>سمك الحد</label><input type="range" data-so="stw" min="0" max="3" step="0.1" value="'+(Y.stw==null?1:Y.stw)+'"></div><div class="fld"><label>لون التوهج</label><input type="color" data-so="glow" value="'+(Y.glow||'#19d3c5')+'"> <label class="chk"><input type="checkbox" data-so="gon" '+(Y.glow?'checked':'')+'> تشغيل التوهج</label></div>';
+    B.appendChild(d);
+    d.querySelectorAll('[data-so]').forEach(el=>el.addEventListener('input',()=>{const k=el.dataset.so;
+      if(k==='stw')Y.stw=+el.value;else if(k==='stc')Y.stc=el.value;
+      else{const gc=d.querySelector('[data-so="glow"]').value,on=d.querySelector('[data-so="gon"]').checked;Y.glow=on?gc:null}
       dirty=true;commit()}));
   };
 })();
