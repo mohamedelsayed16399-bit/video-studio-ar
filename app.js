@@ -1176,3 +1176,23 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
     d.querySelectorAll('[data-rf]').forEach(b=>b.onclick=()=>{S.aspect=b.dataset.rf;setCanvasSize(quality);S.clips.forEach(c=>{c.fit='cover';c.px=0;c.py=0});dirty=true;commit();refreshAll();toast('اتعمل تأطير '+S.aspect+' ✅')});
   };
 })();
+
+/* ===== R38: text templates ===== */
+(function(){
+  const TT=[
+    {n:'🎬 عنوان كبير',t:'عنوان الفيديو',o:{y:.45,size:12,anim:'pop',color:'#ffffff'}},
+    {n:'📛 اسم تحت الشاشة',t:'الاسم | الوظيفة',o:{x:.3,y:.82,size:5,anim:'rise',bgOn:true,bg:'#1565c0',color:'#ffffff'}},
+    {n:'🔔 اشترك',t:'اشترك في القناة 🔔',o:{y:.9,size:6,anim:'blink',bgOn:true,bg:'#e53935',color:'#ffffff'}},
+    {n:'📰 شريط أخبار',t:'عاجل: اكتب الخبر هنا',o:{y:.92,size:5,anim:'marquee',bgOn:true,bg:'#b71c1c',color:'#ffffff'}},
+    {n:'✨ اقتباس',t:'"اكتب الاقتباس هنا"',o:{y:.5,size:7,anim:'drop',color:'#ffe14d'}},
+    {n:'🔢 العد التنازلي',t:'3',o:{y:.5,size:22,anim:'pop',color:'#ffffff'}}
+  ];
+  const orig=renderPanel;
+  renderPanel=function(){orig.apply(this,arguments);
+    if(S.tab!=='text')return;const B=document.getElementById('panel');if(!B||B.querySelector('#ttBox'))return;
+    const d=document.createElement('div');d.id='ttBox';d.style.cssText='padding:4px 12px 14px';
+    d.innerHTML='<div class="h4">🧩 قوالب نصوص جاهزة</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+TT.map((r,i)=>'<button class="btn" data-tt="'+i+'">'+r.n+'</button>').join('')+'</div>';
+    B.appendChild(d);
+    d.querySelectorAll('[data-tt]').forEach(b=>b.onclick=()=>{const r=TT[+b.dataset.tt],x=addText(r.t);Object.assign(x,r.o);commit();refreshAll();toast('اتضاف القالب ✅')});
+  };
+})();
