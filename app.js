@@ -247,7 +247,7 @@ function drawFrame(ctx,w,h,t,opt={}){
   });
   if(VIZ.on&&ENHN.an)drawViz(ctx,w,h);
   S.texts.forEach(tx=>{
-    if(t<tx.start||t>tx.end)return;const lt=t-tx.start,d=Math.max(.1,tx.end-tx.start);let alpha=1,sc=1,dy=0,txt=tx.text;
+    if(t<tx.start||t>tx.end)return;const lt=t-tx.start,d=Math.max(.1,tx.end-tx.start);let alpha=1,sc=1,dy=0,xo=0,txt=tx.text;
     if(tx.anim==='fade')alpha=Math.min(1,lt/.4,(d-lt)/.4);
     else if(tx.anim==='pop'){sc=.55+.45*easeBack(Math.min(1,lt/.35));alpha=Math.min(1,lt/.12,(d-lt)/.25)}
     else if(tx.anim==='slide'){dy=(1-easeOut(Math.min(1,lt/.45)))*h*.1;alpha=Math.min(1,lt/.3,(d-lt)/.3)}
@@ -255,9 +255,14 @@ function drawFrame(ctx,w,h,t,opt={}){
     else if(tx.anim==='zoom'){const k=easeOut(Math.min(1,lt/.5));sc=2.2-1.2*k;alpha=Math.min(k*1.5,1,(d-lt)/.25)}
     else if(tx.anim==='bounce'){const k=Math.min(1,lt/.7);dy=-Math.abs(Math.sin(k*Math.PI*3))*(1-k)*h*.14;alpha=Math.min(1,lt/.1,(d-lt)/.25)}
     else if(tx.anim==='float'){dy=Math.sin(lt*2.4)*h*.012;alpha=Math.min(1,lt/.3,(d-lt)/.3)}
+    else if(tx.anim==='marquee'){xo=w*(.95-1.9*Math.min(1,lt/d));alpha=1}
+    else if(tx.anim==='rise'){const k=easeOut(Math.min(1,lt/.6));dy=(1-k)*h*.18;alpha=Math.min(k,(d-lt)/.25)}
+    else if(tx.anim==='shake'){const fr=Math.floor(lt*28);xo=(rnd(fr,7)-.5)*w*.012;dy=(rnd(fr,8)-.5)*h*.012;alpha=Math.min(1,lt/.1,(d-lt)/.2)}
+    else if(tx.anim==='blink'){alpha=Math.floor(lt*2.5)%2===0?1:.15;alpha=Math.min(alpha,(d-lt)/.2+.0)}
+    else if(tx.anim==='drop'){const k=Math.min(1,lt/.55);dy=-(1-k)*(1-k)*h*.4;alpha=Math.min(1,lt/.1,(d-lt)/.25);if(k>.85&&k<1)sc=1+.08*Math.sin((k-.85)/.15*Math.PI)}
     else if(tx.anim==='type'){txt=[...tx.text].slice(0,Math.ceil([...tx.text].length*Math.min(1,lt/(d*.55)))).join('')}
     if(!txt)return;
-    drawCaption(ctx,w,h,txt,tx.x*w,tx.y*h,tx.size,tx.color,tx.bgOn?tx.bg:null,{alpha,sc,dy,weight:tx.weight});
+    drawCaption(ctx,w,h,txt,tx.x*w+xo,tx.y*h,tx.size,tx.color,tx.bgOn?tx.bg:null,{alpha,sc,dy,weight:tx.weight});
   });
   if(opt.subs!==false&&S.subStyle.burn){
     const sub=S.subs.find(s=>t>=s.s&&t<=s.e);
@@ -438,7 +443,7 @@ function panelText(){
   h+=`<div class="r2"><div class="fld"><label>يبدأ (ثانية)</label><input type="number" step="0.1" min="0" data-o="text" data-k="start" value="${tx.start.toFixed(1)}"></div><div class="fld"><label>ينتهي (ثانية)</label><input type="number" step="0.1" min="0" data-o="text" data-k="end" value="${tx.end.toFixed(1)}"></div></div>`;
   h+=sld(tx,'size','الحجم',2,30,.5,'%')+sld(tx,'x','أفقي',0,1,.01)+sld(tx,'y','رأسي',0,1,.01);
   h+=`<div class="r3">${clr(tx,'color','لون النص')}${clr(tx,'bg','لون الخلفية')}${chk(tx,'bgOn','خلفية')}</div>`;
-  h+=sel_(tx,'anim','الحركة',[['none','بدون'],['fade','ظهور تدريجي'],['pop','بوب'],['slide','انزلاق'],['type','كتابة'],['words','كلمة كلمة'],['zoom','زووم داخل'],['bounce','نطّ'],['float','طفو']]);
+  h+=sel_(tx,'anim','الحركة',[['none','بدون'],['fade','ظهور تدريجي'],['pop','بوب'],['slide','انزلاق'],['type','كتابة'],['words','كلمة كلمة'],['zoom','زووم داخل'],['bounce','نطّ'],['float','طفو'],['marquee','شريط متحرك'],['rise','طلوع'],['shake','اهتزاز'],['blink','وميض'],['drop','سقوط']]);
   h+=sel_(tx,'weight','السُمك',[[400,'عادي'],[700,'عريض'],[900,'عريض جداً']]);
   return h;
 }
