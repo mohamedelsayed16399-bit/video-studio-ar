@@ -1733,6 +1733,56 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   window.__scBuild=build;
 })();
 
+/* ===== R68: one-click complete project (intro card + outro card + generated music + fades + ducking) ===== */
+(function(){
+  const PB={intro:'عنوان الفيديو',sub:'اكتب العنوان الفرعي هنا',outro:'شكراً للمشاهدة',music:true,busy:false};
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  async function run(){
+    if(PB.busy)return;
+    if(!S.clips.length){toast('ضيف مقاطع الأول');return}
+    PB.busy=true;const oc=commit;commit=function(){};const keep={t:CARD.t,s:CARD.s};
+    try{
+      toast('بجهّز المشروع... ثواني',6000);
+      CARD.t=PB.intro;CARD.s=PB.sub;await addCard('start');
+      CARD.t=PB.outro;CARD.s='';await addCard('end');
+      layout();
+      if(PB.music){
+        const n0=S.audios.length;S.tab='audio';S.playhead=0;renderPanel();
+        const btn=document.querySelector('[data-gm]'),len=document.querySelector('#genLen');
+        if(btn&&len){len.value=Math.max(8,Math.min(120,Math.ceil(total)));btn.click();
+          for(let i=0;i<150&&S.audios.length<=n0;i++)await sleep(200);
+          const u=S.audios[S.audios.length-1];
+          if(S.audios.length>n0&&u){u.start=0;u.fi=1;u.fo=2;u.vol=60;u.out=Math.min(u.out,total)}}
+        DUCK.on=true;
+      }
+      const F=S.subStyle.fio||(S.subStyle.fio={i:0,o:0,c:'b'});F.i=.3;F.o=.9;F.c='b';
+      S.tab='media';
+    }catch(e){console.warn(e);toast('حصل خطأ، جرّب تاني')}
+    finally{commit=oc;CARD.t=keep.t;CARD.s=keep.s;PB.busy=false;commit();refreshAll();seekTo(0);toast('المشروع جاهز: مقدمة وختام وموسيقى ✅ (لو مش عاجبك اضغط تراجع)',5000)}
+  }
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='media')return r;
+      const d=document.createElement('div');d.id='pbBox';d.style.cssText='padding:4px 12px 14px';
+      d.innerHTML='<div class="h4">🚀 مشروع كامل بضغطة</div><p class="hint">بيضيف كارت مقدمة وكارت ختام وموسيقى بتتولّد على جهازك وفيد وخفض الموسيقى مع الكلام.</p>'+
+        '<div class="fld"><label>عنوان المقدمة</label><input type="text" id="pbIn" value="'+esc(PB.intro)+'"></div>'+
+        '<div class="fld"><label>سطر فرعي</label><input type="text" id="pbSub" value="'+esc(PB.sub)+'"></div>'+
+        '<div class="fld"><label>كلمة الختام</label><input type="text" id="pbOut" value="'+esc(PB.outro)+'"></div>'+
+        '<label class="chk" style="display:flex;gap:6px;align-items:center;margin:6px 0"><input type="checkbox" id="pbMus"'+(PB.music?' checked':'')+'> أضف موسيقى تلقائي</label>'+
+        '<button class="btn primary" id="pbGo">🚀 جهّز المشروع</button>';
+      B.appendChild(d);
+      d.querySelector('#pbIn').addEventListener('input',e=>{PB.intro=e.target.value});
+      d.querySelector('#pbSub').addEventListener('input',e=>{PB.sub=e.target.value});
+      d.querySelector('#pbOut').addEventListener('input',e=>{PB.outro=e.target.value});
+      d.querySelector('#pbMus').addEventListener('change',e=>{PB.music=e.target.checked});
+      d.querySelector('#pbGo').onclick=run;
+    }catch(e){}
+    return r;
+  };
+})();
+
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
 (function(){
   const o=renderPanel;
