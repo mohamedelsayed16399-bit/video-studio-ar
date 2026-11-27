@@ -1530,6 +1530,44 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   };
 })();
 
+/* ===== R57: audio mixer (volume / mute / solo per track, clip audio included) ===== */
+(function(){
+  const anySolo=()=>S.clips.some(c=>c.solo)||S.audios.some(u=>u.solo);
+  const o0=syncMedia;
+  syncMedia=function(t){
+    const as=anySolo(),saved=S.audios.map(u=>u.vol);
+    S.audios.forEach(u=>{if(u.mute||(as&&!u.solo))u.vol=0});
+    try{o0.apply(this,arguments)}finally{S.audios.forEach((u,i)=>{u.vol=saved[i]})}
+    const ci=clipAt(t);
+    if(ci>=0){const c=S.clips[ci],a=assets[c.aid];
+      if(a&&a.el&&a.type==='video'){const silent=c.mute||(as&&!c.solo);a.el.volume=silent?0:clamp(c.vol/100,0,1)}}
+  };
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='audio')return r;
+      const nm=a=>((a&&(a.name||(a.file&&a.file.name)))||'مسار').toString().slice(0,22);
+      const rows=[];
+      S.clips.forEach((c,i)=>{const a=assets[c.aid];if(a&&a.type==='video')rows.push({k:'c',o:c,l:'🎬 '+(i+1)+' '+nm(a)})});
+      S.audios.forEach((u,i)=>rows.push({k:'a',o:u,l:'🎵 '+nm(assets[u.aid])}));
+      if(!rows.length)return r;
+      const d=document.createElement('div');d.id='mxBox';d.style.cssText='padding:4px 12px 14px';
+      d.innerHTML='<div class="h4">🎚 المازج (Mixer)</div><p class="hint">تحكم في صوت كل مسار. M = كتم، S = سولو (يسمع المسار ده بس).</p>'+
+        rows.map((x,i)=>'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="flex:0 0 38%;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+x.l+'</span>'+
+        '<input type="range" data-mxv="'+i+'" min="0" max="'+(x.k==='c'?100:200)+'" value="'+Math.min(x.o.vol,x.k==='c'?100:200)+'" style="flex:1;min-width:0">'+
+        '<button class="btn" data-mxm="'+i+'" style="padding:2px 8px;'+(x.o.mute?'background:#ff5d6c;color:#fff':'')+'">M</button>'+
+        '<button class="btn" data-mxs="'+i+'" style="padding:2px 8px;'+(x.o.solo?'background:#ffc107;color:#000':'')+'">S</button></div>').join('');
+      B.appendChild(d);
+      d.querySelectorAll('[data-mxv]').forEach(e=>e.addEventListener('input',()=>{rows[+e.dataset.mxv].o.vol=+e.value;dirty=true;syncMedia(S.playhead)}));
+      d.querySelectorAll('[data-mxv]').forEach(e=>e.addEventListener('change',()=>commit()));
+      d.querySelectorAll('[data-mxm]').forEach(e=>e.onclick=()=>{const x=rows[+e.dataset.mxm].o;x.mute=!x.mute;dirty=true;commit();renderPanel();syncMedia(S.playhead)});
+      d.querySelectorAll('[data-mxs]').forEach(e=>e.onclick=()=>{const x=rows[+e.dataset.mxs].o;x.solo=!x.solo;dirty=true;commit();renderPanel();syncMedia(S.playhead)});
+    }catch(e){}
+    return r;
+  };
+})();
+
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
 (function(){
   const o=renderPanel;
