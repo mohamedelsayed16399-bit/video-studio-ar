@@ -296,7 +296,7 @@ function drawFrame(ctx,w,h,t,opt={}){
     else if(tx.anim==='drop'){const k=Math.min(1,lt/.55);dy=-(1-k)*(1-k)*h*.4;alpha=Math.min(1,lt/.1,(d-lt)/.25);if(k>.85&&k<1)sc=1+.08*Math.sin((k-.85)/.15*Math.PI)}
     else if(tx.anim==='type'){txt=[...tx.text].slice(0,Math.ceil([...tx.text].length*Math.min(1,lt/(d*.55)))).join('')}
     if(!txt)return;
-    drawCaption(ctx,w,h,txt,tx.x*w+xo,tx.y*h,tx.size,tx.color,tx.bgOn?tx.bg:null,{alpha,sc,dy,weight:tx.weight,stc:tx.stc,stw:tx.stw,glow:tx.glow});
+    drawCaption(ctx,w,h,txt,tx.x*w+xo,tx.y*h,tx.size,tx.color,tx.bgOn?tx.bg:null,{alpha:alpha*(tx._op==null?1:tx._op),sc,dy,weight:tx.weight,stc:tx.stc,stw:tx.stw,glow:tx.glow});
   });
   if(opt.subs!==false&&S.subStyle.burn){
     const sub=S.subs.find(s=>t>=s.s&&t<=s.e);
@@ -1409,7 +1409,7 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   const hd=document.createElement('div');hd.style.cssText='position:absolute;right:-12px;bottom:-12px;width:24px;height:24px;border-radius:50%;background:#7c5cff;border:2px solid #fff;pointer-events:auto;cursor:nwse-resize;touch-action:none';
   box.appendChild(hd);document.body.appendChild(box);
   const mc=document.createElement('canvas').getContext('2d');
-  function curText(){if(!S.sel||S.sel.k!=='text')return null;const tx=selObj();if(!tx||S.playhead<tx.start||S.playhead>tx.end)return null;return tx}
+  function curText(){if(!S.sel||S.sel.k!=='text')return null;const tx=selObj();if(!tx||S.playhead<tx.start||S.playhead>tx.end||(tx.kf&&tx.kf.length))return null;return tx}
   function geom(tx){
     const r=cv.getBoundingClientRect(),w=cv.width,h=cv.height,k=r.width/w,fs=Math.max(8,Math.round(tx.size/100*h));
     mc.font=`${tx.weight||900} ${fs}px ${FONT}`;const lines=wrapText(mc,String(tx.text),w*.88);const bw=Math.max(...lines.map(l=>mc.measureText(l).width))+fs*.5,bh=lines.length*fs*1.38+fs*.3;
@@ -1458,6 +1458,36 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   cv.addEventListener('pointermove',e=>{if(!tp.has(e.pointerId))return;tp.set(e.pointerId,{x:e.clientX,y:e.clientY});if(tpin&&tp.size>=2){const [a,b]=[...tp.values()];tpin.tx.size=+clamp(tpin.s*Math.hypot(a.x-b.x,a.y-b.y)/tpin.d,2,40).toFixed(1);dirty=true}});
   const tend=e=>{if(!tp.has(e.pointerId))return;tp.delete(e.pointerId);if(tp.size<2&&tpin){tpin=null;commit();renderPanel()}};
   cv.addEventListener('pointerup',tend);cv.addEventListener('pointercancel',tend);
+})();
+
+/* ===== R54: keyframes for text (position, size, opacity) ===== */
+(function(){
+  const ease=x=>x*x*(3-2*x);
+  function at(tx,lt){const L=tx.kf;if(!L||!L.length)return null;if(lt<=L[0].t)return L[0];if(lt>=L[L.length-1].t)return L[L.length-1];let i=0;while(i<L.length-1&&L[i+1].t<lt)i++;const a=L[i],b=L[i+1],u0=(lt-a.t)/Math.max(1e-6,b.t-a.t),u=tx.kfe==='lin'?u0:ease(u0),m=(p,q)=>p+(q-p)*u;return{x:m(a.x,b.x),y:m(a.y,b.y),size:m(a.size,b.size),op:m(a.op,b.op)}}
+  const od=drawFrame;
+  drawFrame=function(ctx,w,h,t,opt){
+    const saved=[];
+    for(const tx of S.texts){if(tx.kf&&tx.kf.length&&t>=tx.start&&t<=tx.end){const v=at(tx,t-tx.start);saved.push([tx,tx.x,tx.y,tx.size]);tx.x=v.x;tx.y=v.y;tx.size=v.size;tx._op=Math.max(0,Math.min(1,v.op/100))}}
+    try{return od.apply(this,arguments)}finally{for(const [tx,x,y,sz] of saved){tx.x=x;tx.y=y;tx.size=sz;tx._op=null}}
+  };
+  let sel=0;
+  const orig=renderPanel;
+  renderPanel=function(){orig.apply(this,arguments);
+    if(S.tab!=='text')return;const tx=S.sel&&S.sel.k==='text'?selObj():null;if(!tx)return;const B=document.getElementById('panel');if(!B)return;
+    const L=tx.kf||(tx.kf=[]);if(sel>=L.length)sel=Math.max(0,L.length-1);const cur=L[sel];
+    const row=(k,lab,min,max,step,u)=>cur?'<div class="fld"><label>'+lab+' <b>'+(+cur[k]).toFixed(k==='size'||k==='op'?0:2)+u+'</b></label><input type="range" data-tk="'+k+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+cur[k]+'"></div>':'';
+    const d=document.createElement('div');d.id='tkBox';d.style.cssText='padding:4px 12px 14px';
+    d.innerHTML='<div class="h4">🎬 كي فريم للنص</div><p class="hint">النص بيتحرك ويكبر ويتلاشى بين النقط. مع الكي فريم استخدم السلايدرات (السحب بالماوس بيتوقف).</p><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"><button class="btn" id="tkAdd">＋ كي فريم عند المؤشر</button>'+(L.length?'<button class="btn" id="tkDel">🗑 احذف المحدد</button><button class="btn" id="tkClr">مسح الكل</button>':'')+'</div>'+
+      (L.length?'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'+L.map((k,i)=>'<button class="btn" data-tki="'+i+'" style="'+(i===sel?'outline:2px solid #7c5cff':'')+'">'+k.t.toFixed(1)+'ث</button>').join('')+'</div>':'')+
+      row('x','أفقي',0,1,.01,'')+row('y','رأسي',0,1,.01,'')+row('size','الحجم',2,40,.5,'')+row('op','شفافية',0,100,1,'%');
+    B.appendChild(d);
+    d.querySelector('#tkAdd').onclick=()=>{const lt=clamp(S.playhead-tx.start,0,tx.end-tx.start),t=+lt.toFixed(2),v=at(tx,lt)||{x:tx.x,y:tx.y,size:tx.size,op:100};const ex=L.findIndex(k=>Math.abs(k.t-t)<.05);
+      if(ex>=0)sel=ex;else{L.push({t,x:v.x,y:v.y,size:v.size,op:v.op});L.sort((a,b)=>a.t-b.t);sel=L.findIndex(k=>k.t===t)}dirty=true;commit();refreshAll()};
+    const del=d.querySelector('#tkDel');if(del)del.onclick=()=>{L.splice(sel,1);sel=0;dirty=true;commit();refreshAll()};
+    const clr=d.querySelector('#tkClr');if(clr)clr.onclick=()=>{tx.kf=[];sel=0;dirty=true;commit();refreshAll()};
+    d.querySelectorAll('[data-tki]').forEach(b=>b.onclick=()=>{sel=+b.dataset.tki;seekTo(tx.start+L[sel].t);renderPanel()});
+    d.querySelectorAll('[data-tk]').forEach(el=>el.addEventListener('input',()=>{cur[el.dataset.tk]=+el.value;el.previousElementSibling.querySelector('b').textContent=el.value;dirty=true;commit()}));
+  };
 })();
 
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
