@@ -1075,3 +1075,16 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   };
   window.__gen={makeMusic,makeSfx};
 })();
+
+/* ===== R30: platform export presets ===== */
+(function(){
+  const PL=[['📱 تيك توك / ريلز / شورتس','9:16',1080,30,true],['▶️ يوتيوب','16:9',1080,30,false],['📷 إنستجرام بوست','4:5',1080,30,true],['⬛ مربع (فيسبوك/تويتر)','1:1',720,30,true],['💬 ستاتس واتساب (خفيف)','9:16',720,30,true],['🖥 عرض 4:3','4:3',720,30,false]];
+  const orig=renderPanel;
+  renderPanel=function(){orig.apply(this,arguments);
+    if(S.tab!=='export')return;const B=document.getElementById('panel');if(!B||B.querySelector('#platBox'))return;
+    const d=document.createElement('div');d.id='platBox';d.style.cssText='padding:12px 12px 4px';
+    d.innerHTML='<div class="h4" style="margin-top:0">⚡ إعدادات جاهزة للمنصات</div><div class="presets" style="grid-template-columns:repeat(2,1fr)">'+PL.map((p,i)=>'<button data-pl="'+i+'" style="padding:10px 6px;font-size:12px">'+p[0]+'</button>').join('')+'</div><p class="hint" style="margin:6px 0 0">بتظبط الأبعاد والجودة، ولو الأبعاد غير 16:9 بتملّى الإطار بالمقاطع (بدون أشرطة سودا).</p>';
+    const f1=B.querySelector('.fld');if(f1&&f1.parentNode)f1.parentNode.insertBefore(d,f1);else B.appendChild(d);
+    d.querySelectorAll('[data-pl]').forEach(b=>b.onclick=()=>{const p=PL[+b.dataset.pl];S.aspect=p[1];exp.short=p[2];exp.fps=p[3];if(p[4])S.clips.forEach(c=>{c.fit='cover'});else S.clips.forEach(c=>{c.fit='contain'});setCanvasSize(quality);commit();refreshAll();toast('اتظبط: '+p[0].replace(/^\S+\s/,''));renderPanel()});
+  };
+})();
