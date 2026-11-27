@@ -1654,6 +1654,32 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   };
 })();
 
+/* ===== R66: per-clip audio fade in/out ===== */
+(function(){
+  const o=syncMedia;
+  syncMedia=function(t){
+    o.apply(this,arguments);
+    const ci=clipAt(t);if(ci<0)return;const c=S.clips[ci];if(!(c.afi>0||c.afo>0))return;
+    const a=assets[c.aid];if(!a||!a.el||a.type!=='video')return;
+    const lt=t-c._s,d=cdur(c);let f=1;if(c.afi>0)f=Math.min(f,lt/c.afi);if(c.afo>0)f=Math.min(f,(d-lt)/c.afo);
+    a.el.volume=clamp(a.el.volume*clamp(f,0,1),0,1);
+  };
+  const r0=renderPanel;
+  renderPanel=function(){
+    const r=r0.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='fx')return r;
+      const c=S.sel&&S.sel.k==='clip'?selObj():null,a=c&&assets[c.aid];if(!c||!a||a.type!=='video')return r;
+      const d=document.createElement('div');d.id='cafBox';d.style.cssText='padding:4px 12px 14px';
+      const row=(k,l)=>'<div class="fld"><label>'+l+' <b>'+(c[k]||0)+'ث</b></label><input type="range" data-caf="'+k+'" min="0" max="5" step="0.1" value="'+(c[k]||0)+'"></div>';
+      d.innerHTML='<div class="h4">🔉 تلاشي صوت المقطع</div>'+row('afi','دخول تدريجي للصوت')+row('afo','خروج تدريجي للصوت');
+      B.appendChild(d);
+      d.querySelectorAll('[data-caf]').forEach(e=>{e.addEventListener('input',()=>{c[e.dataset.caf]=+e.value;e.previousElementSibling.querySelector('b').textContent=e.value+'ث';dirty=true;syncMedia(S.playhead)});e.addEventListener('change',()=>commit())});
+    }catch(e){}
+    return r;
+  };
+})();
+
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
 (function(){
   const o=renderPanel;
