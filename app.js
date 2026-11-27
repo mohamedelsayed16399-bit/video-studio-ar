@@ -1587,8 +1587,25 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
     {n:'☀ فلوج دافئ',d:'16:9 + ألوان دافئة + انتقال تلاشي + زووم هادي',as:'16:9',pr:'warm',tr:'dip',td:.5,kb:10,vig:false,fio:[.3,.6,'b'],ti:'يومي معاكم',to:{y:.85,size:8,anim:'pop',color:'#ffffff',bgOn:true,bg:'#e65100'}},
     {n:'⚡ تيك توك سريع',d:'9:16 + نيون + انتقال جليتش + زووم',as:'9:16',pr:'neon',tr:'glitcht',td:.3,kb:12,vig:false,fio:[0,.3,'b'],ti:'شوف للآخر 👀',to:{y:.15,size:10,anim:'blink',color:'#ffffff',bgOn:true,bg:'#e53935'}},
     {n:'📷 إنستجرام قديم',d:'4:5 + شكل قديم + انتقال مقسوم',as:'4:5',pr:'vintage',tr:'split',td:.5,kb:6,vig:true,fio:[.4,.6,'b'],ti:'ذكريات',to:{y:.88,size:9,anim:'drop',color:'#fff3c4',bgOn:false}},
+    {n:'🧊 بارد عصري',d:'16:9 + ألوان باردة + انتقال قطري',as:'16:9',pr:'cool',tr:'diag',td:.5,kb:6,vig:false,fio:[.3,.6,'b'],ti:'عنوان عصري',to:{y:.5,size:9,anim:'rise',color:'#ffffff',bgOn:false}},
+    {n:'🍬 باستيل مربع',d:'1:1 + ألوان باهتة ناعمة + تلاشي',as:'1:1',pr:'fade',tr:'fade',td:.6,kb:8,vig:false,fio:[.4,.8,'b'],ti:'لحظات حلوة',to:{y:.88,size:8,anim:'pop',color:'#ffffff',bgOn:true,bg:'#ec407a'}},
+    {n:'🎮 جيمنج',d:'16:9 + نيون + جليتش + اسم القناة',as:'16:9',pr:'neon',tr:'glitcht',td:.35,kb:0,vig:true,fio:[0,.5,'b'],ti:'GAMEPLAY',to:{y:.12,size:8,anim:'blink',color:'#00e5ff',bgOn:false}},
+    {n:'📰 نشرة أخبار',d:'16:9 + شريط عاجل أحمر',as:'16:9',pr:'none',tr:'split',td:.4,kb:0,vig:false,fio:[.2,.4,'b'],ti:'عاجل: اكتب الخبر هنا',to:{y:.9,size:5,anim:'marquee',color:'#ffffff',bgOn:true,bg:'#b71c1c'}},
+    {n:'🎬 تريلر',d:'16:9 + درامي + وميض + فيد طويل',as:'16:9',pr:'drama',tr:'flashw',td:.25,kb:4,vig:true,fio:[1.2,2,'b'],ti:'قريباً',to:{y:.5,size:14,anim:'pop',color:'#ffffff',bgOn:false}},
+    {n:'🌅 غروب دافئ',d:'9:16 + دافئ + زووم بطيء',as:'9:16',pr:'warm',tr:'zout',td:.6,kb:14,vig:true,fio:[.6,1,'b'],ti:'',to:{}},
     {n:'🖤 أبيض وأسود درامي',d:'16:9 + نوار + تظليل + فيد',as:'16:9',pr:'noir',tr:'fade',td:.7,kb:0,vig:true,fio:[.8,1.2,'b'],ti:'',to:{}}
   ];
+  function thumb(t,cv2){
+    const W=132,[ar,br]=ASPECTS[t.as]||[16,9],H=Math.round(W*br/ar);cv2.width=W;cv2.height=H;
+    const oc=S.clips,ot=S.texts,oa=S.aspect,of=S.subStyle.fio;const pt=S.playhead;
+    try{
+      S.clips=oc.map(c=>Object.assign({},c));S.texts=ot.slice();S.aspect=t.as;S.subStyle.fio=null;
+      const tt=Math.max(0,Math.min(S.playhead,Math.max(0,total-.05)));
+      S.clips.forEach((c,i)=>{c.preset=t.pr;c.vig=t.vig;c.kb=0;c.fade=0;c.trans='none'});
+      if(t.ti)S.texts.push(Object.assign({id:'thumb',text:t.ti,start:tt-1,end:tt+1,x:.5,y:.5,size:9,color:'#ffffff',bgOn:false,bg:'#000000',anim:'none',weight:900},t.to,{anim:'none'}));
+      const x=cv2.getContext('2d');drawFrame(x,W,H,tt,{nosnap:true,subs:false});
+    }finally{S.clips=oc;S.texts=ot;S.aspect=oa;S.subStyle.fio=of;S.playhead=pt}
+  }
   const o=renderPanel;
   renderPanel=function(){
     const r=o.apply(this,arguments);
@@ -1596,11 +1613,12 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
       const B=document.getElementById('panel');if(!B||S.tab!=='media')return r;
       const d=document.createElement('div');d.id='tgBox';d.style.cssText='padding:4px 12px 14px';
       d.innerHTML='<div class="h4">🖼 قوالب جاهزة للمشروع كله</div><p class="hint">ضغطة واحدة تظبط الأبعاد والألوان والانتقالات والفيد وعنوان. تقدر تتراجع (Undo).</p>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+TG.map((t,i)=>'<button class="btn" data-tg="'+i+'" style="text-align:right;padding:8px"><b>'+t.n+'</b><br><span style="font-size:11px;opacity:.7">'+t.d+'</span></button>').join('')+'</div>';
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+TG.map((t,i)=>'<button class="btn" data-tg="'+i+'" style="text-align:right;padding:6px"><canvas style="width:100%;border-radius:6px;background:#000;display:block;margin-bottom:4px"></canvas><b>'+t.n+'</b><br><span style="font-size:11px;opacity:.7">'+t.d+'</span></button>').join('')+'</div>';
       B.appendChild(d);
-      d.querySelectorAll('[data-tg]').forEach(b=>b.onclick=()=>{
+      d.querySelectorAll('[data-tg]').forEach(b=>{const t=TG[+b.dataset.tg];const cv2=b.querySelector('canvas');
+        try{if(cv2)thumb(t,cv2)}catch(e){}
+        b.onclick=()=>{
         if(!S.clips.length){toast('ضيف مقاطع الأول');return}
-        const t=TG[+b.dataset.tg];
         commit();const oc=commit;commit=function(){};try{
         S.aspect=t.as;setCanvasSize(quality);
         S.clips.forEach((c,i)=>{c.preset=t.pr;c.vig=t.vig;c.kb=t.kb;c.trans=i?t.tr:'none';c.transD=t.td});
@@ -1609,7 +1627,7 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
         layout();
         if(t.ti){const x=addText(t.ti);Object.assign(x,t.to,{start:.3,end:Math.min(3,total),_tpl:1})}
         S.tab='media';}finally{commit=oc}commit();refreshAll();seekTo(0);toast('اتطبق قالب '+t.n+' ✅',3500);
-      });
+      }});
     }catch(e){}
     return r;
   };
