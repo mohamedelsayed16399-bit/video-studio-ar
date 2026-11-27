@@ -2125,6 +2125,270 @@ function ovMotion(ov,lt,d){
     return r;
   };
 })();
+/* ===== R79: reverse clip (frames are captured once, then played backwards; reversed clip is silent) ===== */
+(function(){
+  const REV={};let busy=false,msg='';
+  const MAXF=120;
+  async function capture(c,a){
+    const el=a.el;try{el.pause()}catch(e){}if(typeof P!=='undefined'&&P.playing&&typeof pause==='function')pause();
+    const dur=c.out-c.in,n=Math.max(2,Math.min(MAXF,Math.ceil(dur*24))),fps=n/dur;
+    const vw=el.videoWidth,vh=el.videoHeight,k=Math.min(1,720/Math.max(vw,vh)),cw=Math.round(vw*k),ch=Math.round(vh*k);
+    const cv2=document.createElement('canvas');cv2.width=cw;cv2.height=ch;const x=cv2.getContext('2d');
+    const frames=[],t0=el.currentTime;
+    for(let i=0;i<n;i++){
+      const tt=Math.min(c.out-.001,c.in+i/fps);
+      await new Promise(res=>{let done=false;const f=()=>{if(done)return;done=true;el.removeEventListener('seeked',f);res()};el.addEventListener('seeked',f);setTimeout(f,2500);if(Math.abs(el.currentTime-tt)<.001){f()}else el.currentTime=tt});
+      x.drawImage(el,0,0,cw,ch);frames.push(await createImageBitmap(cv2));
+      if(i%10===0){msg='بحفظ الفريمات '+Math.round(i/n*100)+'%';const e=document.getElementById('rvSt');if(e)e.textContent=msg}
+    }
+    try{el.currentTime=t0}catch(e){}
+    return{in:c.in,out:c.out,fps,frames,w:cw,h:ch};
+  }
+  async function doRev(c){
+    const a=assets[c.aid];if(!a||a.type!=='video'){return}
+    if(c.ramp){toast('الـ Reverse مش شغال مع السرعة المتغيرة. شيل الـ Speed Ramp الأول');return}
+    if(c.out-c.in>30){toast('الـ Reverse للمقاطع لحد 30 ثانية. قص المقطع الأول');return}
+    busy=true;renderPanel();
+    try{
+      if(!c.revK||!REV[c.revK]||REV[c.revK].in>c.in+.01||REV[c.revK].out<c.out-.01){const R=await capture(c,a);const k='r'+uid();REV[k]=R;c.revK=k}
+      c.revMute=!!c.mute;c.rev=true;c.mute=true;
+      commit();refreshAll();dirty=true;toast('اتعكس المقطع ⏪ (من غير صوت)',3500);
+    }catch(e){console.error('rev',e);toast('معرفتش أعكس المقطع')}
+    finally{busy=false;msg='';renderPanel()}
+  }
+  window.__REV=REV;window.__doRev=doRev;
+  const od=drawClipLayer;
+  drawClipLayer=function(ctx,c,a,w,h,t){
+    if(c.rev&&c.revK&&REV[c.revK]&&a&&a.type==='video'){
+      const R=REV[c.revK],lt=clamp(t-c._s,0,cdur(c)),s=c.out-lt*(c.speed||1),i=clamp(Math.round((s-R.in)*R.fps),0,R.frames.length-1);
+      return od.call(this,ctx,c,{type:'image',img:R.frames[i],w:R.w,h:R.h,id:a.id},w,h,t);
+    }
+    return od.apply(this,arguments);
+  };
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='fx')return r;
+      const c=S.sel&&S.sel.k==='clip'?selObj():null;const a=c&&assets[c.aid];
+      if(!c||!a||a.type!=='video')return r;
+      const d=document.createElement('div');d.id='rvBox';d.style.cssText='padding:4px 12px 14px';
+      const has=c.rev&&c.revK&&REV[c.revK];
+      d.innerHTML='<div class="h4">⏪ عكس المقطع (Reverse)</div><p class="hint">بيشغّل المقطع بالمقلوب. بياخد ثواني يحفظ الفريمات (لحد 30 ثانية)، والمقطع المعكوس من غير صوت.'+(c.rev&&!has?' <b>الفريمات اتمسحت بعد إعادة التحميل، اضغط عكس تاني.</b>':'')+'</p>'+
+        '<button class="btn primary" id="rvGo" style="width:100%"'+(busy?' disabled':'')+'>'+(busy?'بشتغل...':c.rev?'↩ رجّع الاتجاه العادي':'⏪ اعكس المقطع')+'</button><div id="rvSt" class="hint">'+msg+'</div>';
+      B.appendChild(d);
+      d.querySelector('#rvGo').onclick=()=>{
+        if(c.rev&&has){c.rev=false;c.mute=!!c.revMute;commit();refreshAll();dirty=true;toast('رجع المقطع عادي');return}
+        doRev(c)};
+    }catch(e){console.error('rv',e)}
+    return r;
+  };
+})();
+/* ===== R80: background blur / replace (free MediaPipe selfie segmenter, runs on the device) ===== */
+(function(){
+  const SEG={st:0,seg:null,err:'',last:-1,M:null,key:'',tm:0};
+  const VER='0.10.14',CDNS=['https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@'+VER,'https://unpkg.com/@mediapipe/tasks-vision@'+VER];
+  const MODEL='https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite';
+  async function init(){
+    if(SEG.st)return;SEG.st=1;
+    for(const base of CDNS){
+      try{
+        const V=await import(base+'/vision_bundle.mjs');
+        const fs=await V.FilesetResolver.forVisionTasks(base+'/wasm');
+        SEG.seg=await V.ImageSegmenter.createFromOptions(fs,{baseOptions:{modelAssetPath:MODEL,delegate:'CPU'},runningMode:'IMAGE',outputConfidenceMasks:true,outputCategoryMask:false});
+        SEG.st=2;if(typeof render==='function')render();const e=document.getElementById('bgSt');if(e)e.textContent='✓ النموذج جاهز';return;
+      }catch(e){SEG.err=String(e&&e.message||e)}
+    }
+    SEG.st=3;toast('معرفتش أحمّل نموذج فصل الخلفية (محتاج نت أول مرة)',4500);
+  }
+  const mk=()=>document.createElement('canvas');
+  const A=mk(),B=mk(),CS=mk(),M=mk(),T=mk();
+  const Q=mk();
+  function mask(t,w,h){
+    const key=Math.floor(t*12);if(SEG.key===key&&SEG.M)return SEG.M;
+    // find the opaque box of the rendered layer (skip letterbox bars) so the person fills the model input
+    const qw=64,qh=Math.max(8,Math.round(64*h/w));Q.width=qw;Q.height=qh;const qx=Q.getContext('2d',{willReadFrequently:true});qx.clearRect(0,0,qw,qh);qx.drawImage(A,0,0,qw,qh);
+    const qd=qx.getImageData(0,0,qw,qh).data;let x0=qw,y0=qh,x1=-1,y1=-1;
+    for(let y=0;y<qh;y++)for(let x=0;x<qw;x++)if(qd[(y*qw+x)*4+3]>20){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}
+    if(x1<0){SEG.M=null;return null}
+    const bx=Math.floor(x0*w/qw),by=Math.floor(y0*h/qh),bw=Math.min(w-bx,Math.ceil((x1+1)*w/qw)-bx),bh=Math.min(h-by,Math.ceil((y1+1)*h/qh)-by);
+    const k=256/Math.max(bw,bh),dw=Math.round(bw*k),dh=Math.round(bh*k),ox=Math.floor((256-dw)/2),oy=Math.floor((256-dh)/2);
+    if(CS.width!==256||CS.height!==256){CS.width=256;CS.height=256}
+    const sx=CS.getContext('2d');sx.fillStyle='#000';sx.fillRect(0,0,256,256);sx.drawImage(A,bx,by,bw,bh,ox,oy,dw,dh);
+    try{
+      SEG.seg.segment(CS,res=>{const m=res.confidenceMasks[0],f=m.getAsFloat32Array(),mw=m.width,mh=m.height;
+        if(M.width!==mw||M.height!==mh){M.width=mw;M.height=mh}
+        const x=M.getContext('2d'),id=x.createImageData(mw,mh),d=id.data;
+        for(let i=0;i<f.length;i++){const v=Math.max(0,Math.min(1,(f[i]-.3)/.4));d[i*4]=255;d[i*4+1]=255;d[i*4+2]=255;d[i*4+3]=Math.round(v*255)}
+        x.putImageData(id,0,0)});
+      SEG.M=M;SEG.key=key;SEG.box=[ox,oy,dw,dh,bx,by,bw,bh];
+    }catch(e){SEG.err=String(e);SEG.M=null}
+    return SEG.M;
+  }
+  const od=drawClipLayer;
+  drawClipLayer=function(ctx,c,a,w,h,t){
+    if(!c.bgm||c.bgm==='none'||!a||a.type==='audio')return od.apply(this,arguments);
+    if(SEG.st===0)init();
+    if(SEG.st!==2||!SEG.seg)return od.apply(this,arguments);
+    if(A.width!==w||A.height!==h){A.width=w;A.height=h;B.width=w;B.height=h}
+    const ax=A.getContext('2d');ax.setTransform(1,0,0,1,0,0);ax.globalAlpha=1;ax.globalCompositeOperation='source-over';ax.clearRect(0,0,w,h);
+    od.call(this,ax,c,a,w,h,t);
+    const m=mask(t,w,h);if(!m){ctx.drawImage(A,0,0);return}
+    // background layer
+    const bx=B.getContext('2d');bx.setTransform(1,0,0,1,0,0);bx.globalCompositeOperation='source-over';bx.globalAlpha=1;bx.clearRect(0,0,w,h);
+    const mode=c.bgm,st=(c.bgs==null?60:c.bgs);
+    if(mode==='blur'||mode==='dim'||mode==='gray'){
+      const f=Math.max(2,Math.round(2+st*.4)),tw=Math.max(8,Math.round(w/f)),th=Math.max(8,Math.round(h/f));
+      T.width=tw;T.height=th;const tx=T.getContext('2d');tx.imageSmoothingQuality='high';tx.drawImage(A,0,0,tw,th);
+      bx.imageSmoothingQuality='high';bx.drawImage(T,0,0,w,h);
+      if(mode==='dim'){bx.fillStyle='rgba(0,0,0,.55)';bx.globalCompositeOperation='source-atop';bx.fillRect(0,0,w,h)}
+      if(mode==='gray'){const id=bx.getImageData(0,0,w,h),d=id.data;for(let i=0;i<d.length;i+=4){const g=.3*d[i]+.59*d[i+1]+.11*d[i+2];d[i]=d[i+1]=d[i+2]=g}bx.putImageData(id,0,0)}
+    }else if(mode==='color'){bx.fillStyle=c.bgc||'#00b140';bx.fillRect(0,0,w,h);bx.globalCompositeOperation='destination-in';bx.drawImage(A,0,0)}
+    // person on top: A masked by M, drawn over background
+    bx.globalCompositeOperation='source-over';
+    const px=T;// reuse T for the person cut-out
+    T.width=w;T.height=h;const tp=T.getContext('2d');tp.drawImage(A,0,0);tp.globalCompositeOperation='destination-in';tp.imageSmoothingQuality='high';const bb=SEG.box;tp.drawImage(m,bb[0],bb[1],bb[2],bb[3],bb[4],bb[5],bb[6],bb[7]);
+    bx.drawImage(T,0,0);
+    ctx.drawImage(B,0,0);
+  };
+  window.__SEG=SEG;window.__segInit=init;
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B0=document.getElementById('panel');if(!B0||S_tab()!=='fx')return r;
+      const c=S.sel&&S.sel.k==='clip'?selObj():null;const a=c&&assets[c.aid];
+      if(!c||!a||a.type==='audio')return r;
+      const d=document.createElement('div');d.id='bgBox';d.style.cssText='padding:4px 12px 14px';
+      const M2=[['none','⛔ بدون'],['blur','🌫 تغبيش'],['gray','⚫ خلفية أبيض وأسود'],['dim','🌑 تعتيم'],['color','🎨 لون ثابت']];
+      d.innerHTML='<div class="h4">🧑‍🎤 خلفية الشخص (تغبيش / استبدال)</div><p class="hint">بيفصل الشخص عن الخلفية بنموذج مجاني بيشتغل على جهازك (بيتحمّل أول مرة من النت). الأفضل مع شخص واضح في الكادر.</p>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+M2.map(([k,n])=>'<button class="btn'+((c.bgm||'none')===k?' primary':'')+'" data-bgm="'+k+'">'+n+'</button>').join('')+'</div>'+
+        (c.bgm==='blur'||c.bgm==='dim'||c.bgm==='gray'?'<div class="fld"><label>قوة التغبيش <b>'+(c.bgs==null?60:c.bgs)+'</b></label><input type="range" id="bgS" min="5" max="100" value="'+(c.bgs==null?60:c.bgs)+'"></div>':'')+
+        (c.bgm==='color'?'<div class="fld"><label>لون الخلفية</label><input type="color" id="bgC" value="'+(c.bgc||'#00b140')+'"></div>':'')+
+        '<div id="bgSt" class="hint">'+(SEG.st===1?'بحمّل النموذج...':SEG.st===2?'✓ النموذج جاهز':SEG.st===3?'فشل التحميل: تأكد من النت وجرّب تاني':'')+'</div>';
+      B0.appendChild(d);
+      d.querySelectorAll('[data-bgm]').forEach(b=>b.onclick=()=>{const v=b.dataset.bgm;if(v==='none')delete c.bgm;else{c.bgm=v;init()}commit();refreshAll();dirty=true});
+      const s=d.querySelector('#bgS');if(s){s.oninput=e=>{c.bgs=+e.target.value;e.target.previousElementSibling.querySelector('b').textContent=c.bgs;SEG.key='';render()};s.onchange=()=>{commit();dirty=true}}
+      const cc=d.querySelector('#bgC');if(cc){cc.oninput=e=>{c.bgc=e.target.value;render()};cc.onchange=()=>{commit();dirty=true}}
+    }catch(e){console.error('bg',e)}
+    return r;
+  };
+  function S_tab(){return S.tab}
+})();
+/* ===== R81: auto reframe (follow the person: keyframes that pan/zoom so the person stays centred) ===== */
+(function(){
+  const AR={zoom:140,v:true,busy:false,msg:''};
+  const seek=(el,tt)=>new Promise(res=>{let done=false;const f=()=>{if(done)return;done=true;el.removeEventListener('seeked',f);res()};el.addEventListener('seeked',f);setTimeout(f,2500);if(Math.abs(el.currentTime-tt)<.001)f();else el.currentTime=tt});
+  async function track(c,a){
+    const SEG=window.__SEG;if(!SEG)throw new Error('no seg');
+    const el=a.el;try{el.pause()}catch(e){}if(P.playing)pause();
+    const dur=c.out-c.in,step=Math.max(.25,dur/90),pts=[];
+    const sq=document.createElement('canvas');sq.width=sq.height=256;const sx=sq.getContext('2d');
+    const vw=el.videoWidth,vh=el.videoHeight,k=256/Math.max(vw,vh),dw=Math.round(vw*k),dh=Math.round(vh*k),ox=Math.floor((256-dw)/2),oy=Math.floor((256-dh)/2);
+    const t0=el.currentTime;
+    for(let tt=0;tt<=dur+1e-6;tt+=step){
+      await seek(el,Math.min(c.out-.001,c.in+tt));
+      sx.fillStyle='#000';sx.fillRect(0,0,256,256);sx.drawImage(el,ox,oy,dw,dh);
+      let r=null;
+      SEG.seg.segment(sq,res=>{const m=res.confidenceMasks[0],f=m.getAsFloat32Array(),w=m.width,h=m.height;let n=0,sxm=0,sym=0,top=h;
+        for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(f[y*w+x]>.5){n++;sxm+=x;sym+=y;if(y<top)top=y}}
+        if(n>w*h*.01)r={x:(sxm/n-ox)/dw,y:(sym/n-oy)/dh,top:(top-oy)/dh}});
+      pts.push({t:tt,r});
+      if(pts.length%5===0){const e=document.getElementById('arSt');if(e)e.textContent='بحلل '+Math.round(tt/dur*100)+'%'}
+    }
+    try{el.currentTime=t0}catch(e){}
+    return pts;
+  }
+  async function go(c){
+    const a=assets[c.aid];if(!a||a.type!=='video')return;
+    if(c.ramp){toast('التتبع مش شغال مع السرعة المتغيرة');return}
+    if(c.out-c.in>120){toast('قص المقطع لأقل من دقيقتين الأول');return}
+    AR.busy=true;renderPanel();
+    const oc=commit;commit=function(){};
+    try{
+      if(!window.__SEG||window.__SEG.st!==2){window.__segInit();toast('بحمّل نموذج التتبع...',2500);
+        for(let i=0;i<60&&(!window.__SEG||window.__SEG.st<2);i++){if(window.__SEG&&window.__SEG.st===3)throw new Error('load');await new Promise(r=>setTimeout(r,500))}}
+      if(!window.__SEG||window.__SEG.st!==2)throw new Error('seg not ready');
+      const pts=await track(c,a);
+      const good=pts.filter(p=>p.r);if(good.length<Math.max(2,pts.length*.3)){toast('معرفتش ألاقي شخص واضح في المقطع');return}
+      // fill gaps with the nearest known point, then smooth
+      let last=good[0].r;pts.forEach(p=>{if(p.r)last=p.r;else p.r=last});
+      const sm=pts.map((p,i)=>{let sx=0,sy=0,n=0;for(let j=Math.max(0,i-2);j<=Math.min(pts.length-1,i+2);j++){sx+=pts[j].r.x;sy+=pts[j].r.y;n++}return{t:p.t,x:sx/n,y:sy/n}});
+      if(AR.v){S.aspect='9:16';setCanvasSize(quality)}
+      const W=cv.width,H=cv.height,sw=a.el.videoWidth,sh=a.el.videoHeight,z=AR.zoom/100;
+      c.fit='cover';c.zoom=AR.zoom;
+      const sc=Math.max(W/sw,H/sh)*z,dwp=sw*sc,dhp=sh*sc,maxx=Math.max(0,(dwp-W)/2)/W*100,maxy=Math.max(0,(dhp-H)/2)/H*100;
+      c.kf=sm.map(p=>({t:+(p.t/(c.speed||1)).toFixed(2),px:clamp((.5-p.x)*dwp/W*100,-maxx,maxx),py:clamp((.45-p.y)*dhp/H*100,-maxy*.6,maxy*.6),zoom:AR.zoom,rot:0,op:100}));
+      c.kfe='ease';c.px=0;c.py=0;
+      layout();
+    }catch(e){console.error('ar',e);toast('معرفتش أعمل التتبع، جرّب تاني')}
+    finally{commit=oc;AR.busy=false}
+    commit();refreshAll();seekTo(c._s);dirty=true;toast('اتعمل تتبع للشخص ✅ (Undo للتراجع)',4000);
+  }
+  window.__arGo=go;window.__AR=AR;
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='fx')return r;
+      const c=S.sel&&S.sel.k==='clip'?selObj():null;const a=c&&assets[c.aid];
+      if(!c||!a||a.type!=='video')return r;
+      const d=document.createElement('div');d.id='arBox';d.style.cssText='padding:4px 12px 14px';
+      d.innerHTML='<div class="h4">🎯 تتبّع الشخص (Auto Reframe)</div><p class="hint">بيتابع الشخص في المقطع ويحرّك الكادر عشان يفضل في النص، مناسب تحويل فيديو أفقي لـ 9:16. بيستخدم نفس نموذج فصل الخلفية (بيتحمّل أول مرة).</p>'+
+        '<div class="fld"><label>القرب <b>'+AR.zoom+'%</b></label><input type="range" id="arZ" min="100" max="250" value="'+AR.zoom+'"></div>'+
+        '<label style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input type="checkbox" id="arV" '+(AR.v?'checked':'')+'> حوّل الكادر لـ 9:16</label>'+
+        '<button class="btn primary" id="arGo" style="width:100%"'+(AR.busy?' disabled':'')+'>'+(AR.busy?'بشتغل...':'🎯 تتبّع الشخص')+'</button>'+
+        (c.kf&&c.kf.length>2?'<button class="btn" id="arClr" style="width:100%;margin-top:6px">🗑 امسح التتبع</button>':'')+'<div id="arSt" class="hint"></div>';
+      B.appendChild(d);
+      d.querySelector('#arZ').oninput=e=>{AR.zoom=+e.target.value;e.target.previousElementSibling.querySelector('b').textContent=AR.zoom+'%'};
+      d.querySelector('#arV').onchange=e=>{AR.v=e.target.checked};
+      d.querySelector('#arGo').onclick=()=>go(c);
+      const cl=d.querySelector('#arClr');if(cl)cl.onclick=()=>{c.kf=[];commit();refreshAll();dirty=true};
+    }catch(e){console.error('ar',e)}
+    return r;
+  };
+})();
+/* ===== R82: reversed audio for a reversed clip (decodes the clip audio, flips it, adds it as an audio track at the clip start) ===== */
+(function(){
+  let busy=false;
+  function wav(chs,sr){
+    const n=chs[0].length,nc=chs.length,buf=new ArrayBuffer(44+n*nc*2),v=new DataView(buf);
+    const W=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+    W(0,'RIFF');v.setUint32(4,36+n*nc*2,true);W(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,nc,true);v.setUint32(24,sr,true);v.setUint32(28,sr*nc*2,true);v.setUint16(32,nc*2,true);v.setUint16(34,16,true);W(36,'data');v.setUint32(40,n*nc*2,true);
+    let o=44;for(let i=0;i<n;i++)for(let ch=0;ch<nc;ch++){const x=Math.max(-1,Math.min(1,chs[ch][i]));v.setInt16(o,x<0?x*32768:x*32767,true);o+=2}
+    return new Blob([buf],{type:'audio/wav'});
+  }
+  async function revAudio(c){
+    const a=assets[c.aid];if(!a||!a.file)return false;
+    busy=true;renderPanel();
+    try{
+      const ac=new (window.AudioContext||window.webkitAudioContext)();
+      const buf=await ac.decodeAudioData(await a.file.arrayBuffer());const sr=buf.sampleRate;ac.close();
+      const i0=Math.floor(c.in*sr),i1=Math.min(buf.length,Math.ceil(c.out*sr));if(i1-i0<sr*.1)throw new Error('short');
+      const chs=[];for(let ch=0;ch<Math.min(2,buf.numberOfChannels);ch++){const d=buf.getChannelData(ch).subarray(i0,i1),r=new Float32Array(d.length);for(let i=0;i<d.length;i++)r[i]=d[d.length-1-i];chs.push(r)}
+      const f=new File([wav(chs,sr)],'reversed.wav',{type:'audio/wav'});
+      const na=await loadAsset(f,'audio',(i1-i0)/sr);
+      layout();S.audios.push({id:uid(),aid:na.id,start:c._s,in:0,out:Math.min(na.dur||(i1-i0)/sr,cdur(c)),vol:c.revMute?0:Math.max(20,c.vol||100),fi:0,fo:0,_rev:c.id});
+      commit();refreshAll();dirty=true;toast('اتضاف الصوت المعكوس على مسار الصوت ✅',4000);return true;
+    }catch(e){console.error('revA',e);toast('معرفتش أعكس الصوت (المقطع ممكن ملوش صوت)');return false}
+    finally{busy=false;renderPanel()}
+  }
+  window.__revAudio=revAudio;
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='fx')return r;
+      const c=S.sel&&S.sel.k==='clip'?selObj():null;if(!c||!c.rev)return r;
+      const host=document.getElementById('rvBox');if(!host)return r;
+      const has=S.audios.some(u=>u._rev===c.id);
+      const b=document.createElement('button');b.className='btn';b.id='rvAud';b.style.cssText='width:100%;margin-top:6px';b.disabled=busy||has;
+      b.textContent=has?'✓ الصوت المعكوس مضاف (امسحه من مسار الصوت لو مش عايزه)':busy?'بشتغل...':'🔊 اعكس الصوت كمان';
+      b.onclick=()=>revAudio(c);host.appendChild(b);
+    }catch(e){console.error('ra',e)}
+    return r;
+  };
+})();
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
 (function(){
   const o=renderPanel;
