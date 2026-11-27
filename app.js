@@ -277,6 +277,7 @@ function drawFrame(ctx,w,h,t,opt={}){
   S.overlays.forEach(ov=>{
     if(t<ov.start||t>ov.end)return;const a=assets[ov.aid];if(!a||(!a.img&&a.type!=='video'))return;const vel=a.type==='video'?ovEl(ov):null;if(a.type==='video'&&(!vel||vel.readyState<2))return;const lt=t-ov.start,d=Math.max(.1,ov.end-ov.start);
     let al=ov.opacity/100,sc=1;if(ov.anim==='fade')al*=Math.min(1,lt/.4,(d-lt)/.4);else if(ov.anim==='pop'){sc=.5+.5*easeBack(Math.min(1,lt/.35));al*=Math.min(1,lt/.1,(d-lt)/.2)}else if(ov.anim==='float')sc=1+Math.sin(lt*3)*.04;
+    if(ov.cell){const src=vel||a.img,cw=ov.cell[2]*w,ch=ov.cell[3]*h,cx=ov.cell[0]*w,cy=ov.cell[1]*h,sw=a.w,sh=a.h,k=Math.max(cw/sw,ch/sh)*(ov.cz||1),vw=cw/k,vh=ch/k;ctx.save();ctx.globalAlpha=clamp(ov.opacity/100,0,1);ctx.beginPath();ctx.rect(cx,cy,cw,ch);ctx.clip();ctx.drawImage(src,clamp((sw-vw)/2+(ov.cpx||0)*sw/100,0,Math.max(0,sw-vw)),clamp((sh-vh)/2+(ov.cpy||0)*sh/100,0,Math.max(0,sh-vh)),Math.min(vw,sw),Math.min(vh,sh),cx,cy,cw,ch);ctx.restore();if(window.__clGap){ctx.save();ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(2,w/400);ctx.strokeRect(cx,cy,cw,ch);ctx.restore()}return}
     const M=ov.mo?ovMotion(ov,lt,d):null;if(M){sc*=M.sc;al*=M.al}
     const dw=w*ov.size/100*sc,dh=dw*a.h/a.w;ctx.save();ctx.globalAlpha=clamp(al,0,1);ctx.translate((ov.x+(M?M.dx:0))*w,(ov.y+(M?M.dy:0))*h);ctx.rotate(((ov.rot||0)+(M?M.rot:0))*Math.PI/180);if(ov.rad){rrect(ctx,-dw/2,-dh/2,dw,dh,Math.min(dw,dh)*ov.rad/100);ctx.save();ctx.clip()}ctx.drawImage(vel||a.img,-dw/2,-dh/2,dw,dh);if(ov.rad)ctx.restore();if(ov.bd){ctx.lineWidth=Math.max(1,dw*ov.bd/200);ctx.strokeStyle='#fff';if(ov.rad)rrect(ctx,-dw/2,-dh/2,dw,dh,Math.min(dw,dh)*ov.rad/100);else{ctx.beginPath();ctx.rect(-dw/2,-dh/2,dw,dh)}ctx.stroke()}ctx.restore();
   });
@@ -2388,6 +2389,72 @@ function ovMotion(ov,lt,d){
     }catch(e){console.error('ra',e)}
     return r;
   };
+})();
+/* ===== R83: collage / split-screen (overlay cells with cover-crop) ===== */
+(function(){
+  const LAY=[['جنب بعض ◧◨',[[.5,0,.5,1]]],['فوق وتحت',[[0,.5,1,.5]]],['٢×٢ أربعة',[[.5,0,.5,.5],[0,.5,.5,.5],[.5,.5,.5,.5]]],['٣ أعمدة',[[1/3,0,1/3,1],[2/3,0,1/3,1]]],['كبير + صغيرين',[[.66,0,.34,.5],[.66,.5,.34,.5]]]];
+  window.__applyCollage=function(i){
+    const sel=S.sel&&S.sel.k==='ov'?selObj():null;const list=S.overlays.filter(o=>assets[o.aid]&&(assets[o.aid].type==='video'||assets[o.aid].type==='image')).sort((a,b)=>a.start-b.start);
+    if(!list.length){toast('ضيف فيديو أو صورة كستيكر الأول');return 0}
+    if(sel){list.splice(list.indexOf(sel),1);list.unshift(sel)}
+    const cells=LAY[i][1],oc=commit;commit=function(){};let n=0;
+    try{const t0=sel?sel.start:list[0].start,t1=sel?sel.end:list[0].end;list.slice(0,cells.length).forEach((o,k)=>{o.cell=cells[k].slice();o.start=t0;o.end=t1;o.opacity=100;o.anim='none';delete o.mo;o.rot=0;o.rad=0;o.bd=0;n++})}finally{commit=oc}
+    commit();refreshAll();seekTo(S.playhead);return n};
+  window.__clearCollage=function(){const sel=S.sel&&S.sel.k==='ov'?selObj():null;const L=sel?[sel]:S.overlays;L.forEach(o=>{delete o.cell;delete o.cz;delete o.cpx;delete o.cpy});commit();refreshAll();seekTo(S.playhead)};
+  const o0=renderPanel;
+  renderPanel=function(){
+    const r=o0.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='ov')return r;
+      const sel=S.sel&&S.sel.k==='ov'?selObj():null;
+      const d=document.createElement('div');d.id='clBox';d.style.cssText='padding:4px 12px 14px';
+      d.innerHTML='<div class="h4">🧩 كولاج / تقسيم الشاشة</div><p class="hint">ضيف فيديوهات أو صور كستيكر (من الوسائط)، اختار شكل، وهيتوزعوا على الشاشة مقصوصين تلقائي. الفيديو الأساسي بيفضل في الخلفية.</p><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">'+LAY.map((l,i)=>'<button class="btn" data-cl="'+i+'" style="padding:4px;font-size:12px"><canvas width="90" height="54" style="width:100%;border-radius:6px;background:#12151f;display:block;margin-bottom:3px"></canvas>'+l[0]+'</button>').join('')+'</div>'+
+        '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn" id="clClr">إلغاء التقسيم</button><label style="font-size:12px"><input type="checkbox" id="clGap"'+(window.__clGap?' checked':'')+'> إطار أبيض بين الخلايا</label></div>'+
+        (sel&&sel.cell?'<div style="margin-top:8px"><label style="font-size:12px">زووم الخلية <input type="range" id="clZ" min="100" max="300" value="'+Math.round((sel.cz||1)*100)+'"></label><label style="font-size:12px"> يمين/يسار <input type="range" id="clX" min="-50" max="50" value="'+(sel.cpx||0)+'"></label><label style="font-size:12px"> فوق/تحت <input type="range" id="clY" min="-50" max="50" value="'+(sel.cpy||0)+'"></label></div>':'');
+      B.appendChild(d);
+      d.querySelectorAll('canvas').forEach((c,i)=>{const x=c.getContext('2d');x.fillStyle='#2b3350';x.fillRect(0,0,90,54);x.fillStyle='#7c5cff';LAY[i][1].forEach(k=>x.fillRect(k[0]*90+1,k[1]*54+1,k[2]*90-2,k[3]*54-2))});
+      d.querySelectorAll('[data-cl]').forEach(b=>b.onclick=()=>window.__applyCollage(+b.dataset.cl));
+      d.querySelector('#clClr').onclick=()=>window.__clearCollage();
+      d.querySelector('#clGap').onchange=e=>{window.__clGap=e.target.checked;dirty=true;seekTo(S.playhead)};
+      const bind=(id,f)=>{const e=d.querySelector(id);if(e){e.oninput=()=>{f(+e.value);dirty=true;seekTo(S.playhead)};e.onchange=()=>commit()}};
+      bind('#clZ',v=>sel.cz=v/100);bind('#clX',v=>sel.cpx=v);bind('#clY',v=>sel.cpy=v);
+    }catch(e){console.warn('R83',e)}
+    return r};
+})();
+/* ===== R84: synthesized sound-effects library (no files, no network; generated in the browser) ===== */
+(function(){
+  const SR=44100;
+  const G={
+    whoosh:d=>{const n=d*SR,o=new Float32Array(n);let lp=0;for(let i=0;i<n;i++){const t=i/n,e=Math.sin(Math.PI*t)**2,c=.02+.5*t;lp+=(Math.random()*2-1-lp)*c;o[i]=lp*e*1.6}return o},
+    pop:d=>{const n=d*SR,o=new Float32Array(n);for(let i=0;i<n;i++){const t=i/SR;o[i]=Math.sin(2*Math.PI*(700-1800*t)*t)*Math.exp(-t*35)*.9}return o},
+    ding:d=>{const n=d*SR,o=new Float32Array(n);for(let i=0;i<n;i++){const t=i/SR;o[i]=(Math.sin(2*Math.PI*1318*t)+.5*Math.sin(2*Math.PI*2637*t)+.25*Math.sin(2*Math.PI*3951*t))*Math.exp(-t*4)*.35}return o},
+    boom:d=>{const n=d*SR,o=new Float32Array(n);let lp=0;for(let i=0;i<n;i++){const t=i/SR;lp+=(Math.random()*2-1-lp)*.05;o[i]=(Math.sin(2*Math.PI*(90-60*Math.min(1,t*2))*t)*.9+lp*.6)*Math.exp(-t*3.2)}return o},
+    riser:d=>{const n=d*SR,o=new Float32Array(n);let ph=0,lp=0;for(let i=0;i<n;i++){const t=i/n;ph+=2*Math.PI*(150+1500*t*t)/SR;lp+=(Math.random()*2-1-lp)*(.05+.5*t);o[i]=(Math.sin(ph)*.35+lp*.6)*(.1+.9*t)*Math.min(1,(1-t)*12)}return o},
+    click:d=>{const n=d*SR,o=new Float32Array(n);for(let i=0;i<n;i++){const t=i/SR;o[i]=(Math.random()*2-1)*Math.exp(-t*160)*.8+Math.sin(2*Math.PI*1800*t)*Math.exp(-t*90)*.4}return o},
+    laser:d=>{const n=d*SR,o=new Float32Array(n);let ph=0;for(let i=0;i<n;i++){const t=i/SR;ph+=2*Math.PI*(2400*Math.exp(-t*9)+200)/SR;o[i]=Math.sin(ph)*Math.exp(-t*7)*.6}return o},
+    coin:d=>{const n=d*SR,o=new Float32Array(n);for(let i=0;i<n;i++){const t=i/SR,f=t<.08?988:1319;o[i]=(Math.sin(2*Math.PI*f*t)+.3*Math.sin(2*Math.PI*f*3*t))*Math.exp(-(t<.08?t*10:(t-.08)*7))*.3}return o},
+    heart:d=>{const n=d*SR,o=new Float32Array(n);const hit=(t0,a)=>{for(let i=Math.floor(t0*SR);i<Math.min(n,Math.floor((t0+.3)*SR));i++){const t=i/SR-t0;o[i]+=Math.sin(2*Math.PI*60*t)*Math.exp(-t*18)*a}};for(let b=0;b*.9<d;b++){hit(b*.9,.9);hit(b*.9+.28,.6)}return o},
+    typing:d=>{const n=d*SR,o=new Float32Array(n);for(let k=0;k*.11<d;k++){const t0=k*.11+Math.random()*.04;for(let i=Math.floor(t0*SR);i<Math.min(n,Math.floor((t0+.05)*SR));i++){const t=i/SR-t0;o[i]+=(Math.random()*2-1)*Math.exp(-t*110)*.5}}return o},
+    applause:d=>{const n=d*SR,o=new Float32Array(n);let lp=0;for(let i=0;i<n;i++){lp+=(Math.random()*2-1-lp)*.35;const t=i/SR;o[i]=lp*(Math.random()<.02?1.6:.45)*Math.min(1,t*4,(d-t)*3)*.7}return o},
+    swipe:d=>{const n=d*SR,o=new Float32Array(n);let lp=0;for(let i=0;i<n;i++){const t=i/n;lp+=(Math.random()*2-1-lp)*(.6-.5*t);o[i]=lp*Math.exp(-t*5)*Math.min(1,t*30)*1.2}return o}
+  };
+  const LIST=[['whoosh','🌬 ووش',.8],['swipe','👋 سحبة',.5],['pop','🫧 بوب',.25],['click','🖱 كليك',.12],['ding','🔔 ديـنج',1.6],['coin','🪙 عملة',.7],['laser','🔫 ليزر',.6],['boom','💥 انفجار/اصطدام',1.8],['riser','📈 رايزر (تصاعد)',3],['heart','❤ نبض',3.6],['typing','⌨ كتابة',2.2],['applause','👏 تصفيق',3.5]];
+  function wav(x){const n=x.length,b=new ArrayBuffer(44+n*2),v=new DataView(b),W=(o,t)=>{for(let i=0;i<t.length;i++)v.setUint8(o+i,t.charCodeAt(i))};W(0,'RIFF');v.setUint32(4,36+n*2,true);W(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,SR,true);v.setUint32(28,SR*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);W(36,'data');v.setUint32(40,n*2,true);let pk=0;for(let i=0;i<n;i++)pk=Math.max(pk,Math.abs(x[i]));const g=pk>0?.9/pk:1;let o=44;for(let i=0;i<n;i++){v.setInt16(o,Math.max(-1,Math.min(1,x[i]*g))*32767,true);o+=2}return new Blob([b],{type:'audio/wav'})}
+  let pac=null;
+  window.__sfxPlay=function(k){const L=LIST.find(l=>l[0]===k);if(!L)return;try{pac=pac||new (window.AudioContext||window.webkitAudioContext)();const x=G[k](L[2]),buf=pac.createBuffer(1,x.length,SR);let pk=0;for(const v of x)pk=Math.max(pk,Math.abs(v));const f=buf.getChannelData(0),g=pk?.8/pk:1;for(let i=0;i<x.length;i++)f[i]=x[i]*g;const s=pac.createBufferSource();s.buffer=buf;s.connect(pac.destination);s.start()}catch(e){console.warn(e)}};
+  window.__sfxAdd=async function(k){const L=LIST.find(l=>l[0]===k);if(!L)return false;const f=new File([wav(G[k](L[2]))],'sfx-'+k+'.wav',{type:'audio/wav'});const na=await loadAsset(f,'audio',L[2]);S.audios.push({id:uid(),aid:na.id,start:S.playhead,in:0,out:Math.min(na.dur||L[2],L[2]),vol:100,fi:0,fo:0});commit();refreshAll();dirty=true;toast('اتضاف '+L[1]+' عند المؤشر ✅');return true};
+  const o0=renderPanel;
+  renderPanel=function(){
+    const r=o0.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='audio')return r;
+      const d=document.createElement('div');d.id='sfxBox';d.style.cssText='padding:4px 12px 14px';
+      d.innerHTML='<div class="h4">🔊 مكتبة مؤثرات صوتية (مجانية ومتولدة جوه المتصفح)</div><p class="hint">▶ تسمع، و"+ ضيف" بيحطه على مسار الصوت عند مكان المؤشر الحالي.</p>'+LIST.map(l=>'<div style="display:flex;align-items:center;gap:6px;margin:4px 0"><span style="flex:1;font-size:13px">'+l[1]+' <small style="opacity:.6">'+l[2]+'ث</small></span><button class="btn" data-sp="'+l[0]+'" style="padding:4px 10px">▶</button><button class="btn" data-sa="'+l[0]+'" style="padding:4px 10px">+ ضيف</button></div>').join('');
+      B.appendChild(d);
+      d.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>window.__sfxPlay(b.dataset.sp));
+      d.querySelectorAll('[data-sa]').forEach(b=>b.onclick=()=>window.__sfxAdd(b.dataset.sa));
+    }catch(e){console.warn('R84',e)}
+    return r};
 })();
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
 (function(){
