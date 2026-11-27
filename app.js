@@ -1013,3 +1013,65 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
     if(S.tab==='export'){const sn=document.getElementById('snapBtn');if(sn&&!document.getElementById('gifBtn')){const b=document.createElement('button');b.id='gifBtn';b.textContent='🎞 صدّر GIF';b.style.cssText='width:100%;margin-top:8px';b.onclick=()=>exportGif(b);sn.after(b)}}};
   window.__exportGif=exportGif;
 })();
+
+/* ===== R28: built-in music + sound effects generator (WebAudio, free, offline) ===== */
+(function(){
+  const SR=44100;
+  const STY={
+    chill:{n:'🌙 هادي',bpm:80,chords:[[57,60,64],[53,57,60],[48,52,55],[55,59,62]],drum:'soft',lead:true,wave:'sine'},
+    upbeat:{n:'☀️ حماسي',bpm:120,chords:[[60,64,67],[67,71,74],[69,72,76],[65,69,72]],drum:'four',lead:true,wave:'triangle'},
+    epic:{n:'🔥 ملحمي',bpm:100,chords:[[57,60,64],[55,59,62],[53,57,60],[52,55,59]],drum:'epic',lead:false,wave:'sawtooth'},
+    lofi:{n:'☕ لوفاي',bpm:70,chords:[[62,65,69,72],[58,62,65,69],[55,58,62,65],[57,61,64,67]],drum:'lofi',lead:true,wave:'triangle'}
+  };
+  const mf=m=>440*Math.pow(2,(m-69)/12);
+  function toWav(buf){const ch=buf.numberOfChannels,n=buf.length,ab=new ArrayBuffer(44+n*ch*2),v=new DataView(ab);const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+    ws(0,'RIFF');v.setUint32(4,36+n*ch*2,true);ws(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,ch,true);v.setUint32(24,buf.sampleRate,true);v.setUint32(28,buf.sampleRate*ch*2,true);v.setUint16(32,ch*2,true);v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,n*ch*2,true);
+    const d=[];for(let c=0;c<ch;c++)d.push(buf.getChannelData(c));let o=44;for(let i=0;i<n;i++)for(let c=0;c<ch;c++){const s=Math.max(-1,Math.min(1,d[c][i]));v.setInt16(o,s<0?s*32768:s*32767,true);o+=2}
+    return new Blob([ab],{type:'audio/wav'})}
+  function noiseBuf(ctx,dur){const b=ctx.createBuffer(1,Math.ceil(dur*SR),SR),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return b}
+  function env(g,t,a,d,pk,end){g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(pk,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+d)}
+  async function makeMusic(key,secs){
+    const st=STY[key],ctx=new OfflineAudioContext(2,SR*secs,SR),beat=60/st.bpm,bar=beat*4,master=ctx.createGain();master.gain.value=.7;master.connect(ctx.destination);
+    const nb=noiseBuf(ctx,.5);
+    const kick=t=>{const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(40,t+.12);env(g,t,.002,.25,.9);o.connect(g);g.connect(master);o.start(t);o.stop(t+.3)};
+    const hat=(t,v=.15)=>{const s=ctx.createBufferSource();s.buffer=nb;const f=ctx.createBiquadFilter();f.type='highpass';f.frequency.value=7000;const g=ctx.createGain();env(g,t,.001,.05,v);s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+.08)};
+    const snare=(t,v=.4)=>{const s=ctx.createBufferSource();s.buffer=nb;const f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=1800;const g=ctx.createGain();env(g,t,.001,.16,v);s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+.2)};
+    const note=(m,t,dur,vol,wave,lp)=>{const o=ctx.createOscillator();o.type=wave;o.frequency.value=mf(m);const f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=lp||2200;const g=ctx.createGain();g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(vol,t+.04);g.gain.setValueAtTime(vol,t+dur-.12);g.gain.linearRampToValueAtTime(.0001,t+dur);o.connect(f);f.connect(g);g.connect(master);o.start(t);o.stop(t+dur+.02)};
+    const nBars=Math.floor(secs/bar);
+    for(let b=0;b<nBars;b++){
+      const t0=b*bar,ch=st.chords[b%st.chords.length];
+      ch.forEach(m=>note(m,t0,bar,.09,st.wave,1800));
+      note(ch[0]-24,t0,beat*2,.28,'sine',400);note(ch[0]-24,t0+beat*2,beat*2,.24,'sine',400);
+      if(st.lead){const sc=[0,3,5,7,10,12];for(let i=0;i<4;i++){if(Math.random()<.7){const m=ch[0]+12+sc[Math.floor(Math.random()*sc.length)];note(m,t0+i*beat+(Math.random()<.3?beat/2:0),beat*.9,.06,'sine',3000)}}}
+      for(let i=0;i<4;i++){const t=t0+i*beat;
+        if(st.drum==='four'){kick(t);hat(t+beat/2,.18);if(i%2)snare(t)}
+        else if(st.drum==='soft'){if(i==0||i==2)kick(t);hat(t+beat/2,.08);if(i==3)snare(t,.15)}
+        else if(st.drum==='epic'){if(i==0||i==2)kick(t);if(i==1||i==3)snare(t,.5);hat(t,.1)}
+        else{if(i==0)kick(t);if(i==2){kick(t+beat/2);}if(i%2)snare(t,.22);hat(t,.1);hat(t+beat/2,.06)}}
+    }
+    const buf=await ctx.startRendering();
+    // fade out
+    const fo=Math.floor(SR*1.5);for(let c=0;c<buf.numberOfChannels;c++){const d=buf.getChannelData(c);for(let i=0;i<fo;i++)d[d.length-1-i]*=i/fo}
+    return toWav(buf)}
+  const SFX={
+    whoosh:{n:'💨 ووش',d:1.1,f(ctx,m){const s=ctx.createBufferSource();s.buffer=noiseBuf(ctx,1.1);const f=ctx.createBiquadFilter();f.type='bandpass';f.Q.value=1.2;f.frequency.setValueAtTime(300,0);f.frequency.exponentialRampToValueAtTime(4000,.55);f.frequency.exponentialRampToValueAtTime(400,1.05);const g=ctx.createGain();g.gain.setValueAtTime(.0001,0);g.gain.linearRampToValueAtTime(.9,.5);g.gain.linearRampToValueAtTime(.0001,1.05);s.connect(f);f.connect(g);g.connect(m);s.start(0)}},
+    pop:{n:'🫧 بوب',d:.3,f(ctx,m){const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.setValueAtTime(700,0);o.frequency.exponentialRampToValueAtTime(180,.12);env(g,0,.003,.15,.9);o.connect(g);g.connect(m);o.start(0);o.stop(.3)}},
+    riser:{n:'📈 رايزر',d:3,f(ctx,m){const o=ctx.createOscillator();o.type='sawtooth';o.frequency.setValueAtTime(100,0);o.frequency.exponentialRampToValueAtTime(1600,2.8);const f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.setValueAtTime(300,0);f.frequency.exponentialRampToValueAtTime(5000,2.8);const g=ctx.createGain();g.gain.setValueAtTime(.0001,0);g.gain.linearRampToValueAtTime(.5,2.8);g.gain.linearRampToValueAtTime(.0001,3);o.connect(f);f.connect(g);g.connect(m);o.start(0);o.stop(3)}},
+    ding:{n:'🔔 دينج',d:1.6,f(ctx,m){[880,1320,1760].forEach((fq,i)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=fq;env(g,0,.005,1.4-i*.3,.4/(i+1));o.connect(g);g.connect(m);o.start(0);o.stop(1.6)})}},
+    boom:{n:'💥 بوم',d:1.6,f(ctx,m){const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.setValueAtTime(120,0);o.frequency.exponentialRampToValueAtTime(28,.9);env(g,0,.003,1.4,1);o.connect(g);g.connect(m);o.start(0);o.stop(1.6);const s=ctx.createBufferSource();s.buffer=noiseBuf(ctx,.6);const lp=ctx.createBiquadFilter();lp.frequency.value=900;const g2=ctx.createGain();env(g2,0,.002,.5,.6);s.connect(lp);lp.connect(g2);g2.connect(m);s.start(0)}},
+    click:{n:'🖱 كليك',d:.15,f(ctx,m){const s=ctx.createBufferSource();s.buffer=noiseBuf(ctx,.05);const f=ctx.createBiquadFilter();f.type='highpass';f.frequency.value=2000;const g=ctx.createGain();env(g,0,.001,.04,.8);s.connect(f);f.connect(g);g.connect(m);s.start(0)}}
+  };
+  async function makeSfx(k){const d=SFX[k].d,ctx=new OfflineAudioContext(1,Math.ceil(SR*d),SR),m=ctx.createGain();m.gain.value=.9;m.connect(ctx.destination);SFX[k].f(ctx,m);return toWav(await ctx.startRendering())}
+  async function addGen(blob,name,dur){
+    try{const f=new File([blob],name+'.wav',{type:'audio/wav'});const a=await loadAsset(f,'audio',dur);if(a&&dur)a.dur=dur;addAudioClip(a.id);toast('اتضاف: '+name+' ✅')}catch(e){console.warn(e);toast('معرفتش أضيف الصوت')}}
+  const orig=renderPanel;
+  renderPanel=function(){orig.apply(this,arguments);
+    if(S.tab!=='audio')return;const B=document.getElementById('panel');if(!B||B.querySelector('#genBox'))return;
+    const d=document.createElement('div');d.id='genBox';d.style.cssText='padding:0 12px 18px';
+    d.innerHTML='<div class="h4">🎼 موسيقى جاهزة (بتتولّد على جهازك)</div><div class="presets" style="grid-template-columns:repeat(2,1fr)">'+Object.entries(STY).map(([k,s])=>'<button data-gm="'+k+'">'+s.n+'</button>').join('')+'</div><div class="fld" style="margin-top:6px"><label>طول الموسيقى (ث)</label><input type="number" id="genLen" min="8" max="120" value="'+Math.min(60,Math.max(10,Math.round(total||30)))+'"></div><div class="h4">🔊 مؤثرات صوتية</div><div class="presets" style="grid-template-columns:repeat(3,1fr)">'+Object.entries(SFX).map(([k,s])=>'<button data-gs="'+k+'" style="padding:10px 2px">'+s.n+'</button>').join('')+'</div>';
+    B.appendChild(d);
+    d.querySelectorAll('[data-gm]').forEach(b=>b.onclick=async()=>{const secs=Math.max(8,Math.min(120,+d.querySelector('#genLen').value||30));b.disabled=true;toast('بولّد الموسيقى...');const bl=await makeMusic(b.dataset.gm,secs);b.disabled=false;await addGen(bl,'موسيقى-'+b.dataset.gm,secs)});
+    d.querySelectorAll('[data-gs]').forEach(b=>b.onclick=async()=>{const k=b.dataset.gs;const bl=await makeSfx(k);await addGen(bl,SFX[k].n.replace(/^\S+\s/,''),SFX[k].d)});
+  };
+  window.__gen={makeMusic,makeSfx};
+})();
