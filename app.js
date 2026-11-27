@@ -1707,8 +1707,17 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
     const V=spans.reduce((n,r)=>n+r[1]-r[0],0),W=L.map(l=>Math.max(4,l.length)),tw=W.reduce((a,b)=>a+b,0);
     const at=v=>{let acc=0;for(const r of spans){const d=r[1]-r[0];if(v<=acc+d+1e-9)return r[0]+Math.max(0,v-acc);acc+=d}return spans[spans.length-1][1]};
     const out=[];let cum=0;
-    L.forEach((l,i)=>{const s=at(cum/tw*V);cum+=W[i];const e=at(cum/tw*V);
-      splitLong({id:uid(),s,e:Math.max(e,s+.4),t:l},SC.max).forEach(x=>out.push(x))});
+    L.forEach((l,i)=>{
+      const v0=cum/tw*V;cum+=W[i];const v1=cum/tw*V;
+      /* pieces: one per voiced span the line touches (so captions never sit on long silences) */
+      const pcs=[];let acc=0;
+      spans.forEach(r=>{const d=r[1]-r[0],a0=Math.max(v0,acc),a1=Math.min(v1,acc+d);if(a1-a0>.05)pcs.push({s:r[0]+(a0-acc),e:r[0]+(a1-acc),w:a1-a0});acc+=d});
+      if(!pcs.length)pcs.push({s:at(v0),e:at(v1),w:1});
+      if(pcs.length===1||SC.mode!=='voice'){const s0=pcs[0].s,e0=pcs[pcs.length-1].e;splitLong({id:uid(),s:s0,e:Math.max(e0,s0+.4),t:l},SC.max).forEach(x=>out.push(x));return}
+      const words=l.split(/\s+/),tw2=pcs.reduce((n,p)=>n+p.w,0);let wi=0,cw=0;
+      pcs.forEach((p,k)=>{cw+=p.w;const upto=k===pcs.length-1?words.length:Math.max(wi+1,Math.round(cw/tw2*words.length));
+        const txt=words.slice(wi,Math.min(words.length,upto)).join(' ');wi=Math.min(words.length,upto);
+        if(txt)splitLong({id:uid(),s:p.s,e:Math.max(p.e,p.s+.4),t:txt},SC.max).forEach(x=>out.push(x))})});
     return out;
   }
   const o=renderPanel;
