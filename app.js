@@ -1603,6 +1603,20 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   };
 })();
 
+/* ===== R59: project fade in/out also fades the audio ===== */
+(function(){
+  const o=syncMedia;
+  syncMedia=function(t){
+    o.apply(this,arguments);
+    const F=S.subStyle&&S.subStyle.fio;if(!F||!(total>0))return;
+    let f=1;if(F.i>0&&t<F.i)f=Math.min(f,Math.max(0,t/F.i));if(F.o>0&&t>total-F.o)f=Math.min(f,Math.max(0,(total-t)/F.o));
+    if(f>=1)return;
+    const ci=clipAt(t);
+    if(ci>=0){const a=assets[S.clips[ci].aid];if(a&&a.el&&a.type==='video')a.el.volume=clamp(a.el.volume*f,0,1)}
+    S.audios.forEach(u=>{const a=assets[u.aid];if(a&&a.el&&!a.el.paused)a.el.volume=clamp(a.el.volume*f,0,1)});
+  };
+})();
+
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
 (function(){
   const o=renderPanel;
