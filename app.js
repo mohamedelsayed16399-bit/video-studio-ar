@@ -1186,7 +1186,11 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
     {n:'🟨 أصفر كلاسيك',s:{size:5.6,color:'#ffe14d',bg:true,pos:88,kar:false}},
     {n:'⬛ صندوق',s:{size:5.4,color:'#ffffff',bg:true,pos:86,kar:false}},
     {n:'💚 نيون',s:{size:6,color:'#39ff88',bg:false,pos:80,kar:true,khc:'#ff3df2'}},
-    {n:'📰 أخبار',s:{size:4.8,color:'#ffffff',bg:true,pos:93,kar:false}}
+    {n:'📰 أخبار',s:{size:4.8,color:'#ffffff',bg:true,pos:93,kar:false}},
+    {n:'💜 بنفسجي ستوري',s:{size:6.4,color:'#ffffff',bg:false,pos:72,kar:true,khc:'#c77dff',stc:'#3c096c',stw:1.6,glow:'#c77dff'}},
+    {n:'🧡 برتقالي',s:{size:6,color:'#ffffff',bg:false,pos:84,kar:true,khc:'#ff9f1c',stc:'#7a3e00',stw:1.4,glow:null}},
+    {n:'🌊 أزرق هادي',s:{size:5.2,color:'#e0fbfc',bg:false,pos:88,kar:false,stc:'#0b3954',stw:1.5,glow:'#19d3c5'}},
+    {n:'⚪ بسيط نضيف',s:{size:4.6,color:'#ffffff',bg:false,pos:92,kar:false,stc:'#000000',stw:.8,glow:null}}
   ];
   const orig=renderPanel;
   renderPanel=function(){orig.apply(this,arguments);
@@ -1194,7 +1198,7 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
     const d=document.createElement('div');d.id='cpBox';d.style.cssText='padding:4px 12px 14px';
     d.innerHTML='<div class="h4">✨ ستايلات جاهزة للترجمة</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+CP.map((c,i)=>'<button class="btn" data-cp="'+i+'">'+c.n+'</button>').join('')+'</div>';
     B.appendChild(d);
-    d.querySelectorAll('[data-cp]').forEach(b=>b.onclick=()=>{Object.assign(S.subStyle,CP[+b.dataset.cp].s);dirty=true;commit();refreshAll();toast('اتطبق ستايل الترجمة ✅')});
+    d.querySelectorAll('[data-cp]').forEach(b=>b.onclick=()=>{Object.assign(S.subStyle,{stc:null,stw:null,glow:null},CP[+b.dataset.cp].s);dirty=true;commit();refreshAll();toast('اتطبق ستايل الترجمة ✅')});
   };
 })();
 
