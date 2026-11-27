@@ -1629,6 +1629,31 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   };
 })();
 
+/* ===== R64: copy / paste a clip's look (filters, framing, fx, transition) ===== */
+(function(){
+  const SKIP=['id','aid','in','out','speed','vol','mute','solo','kf','ramp','_s','pz','pi'];
+  let clip=null;
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='fx')return r;
+      const c=S.sel&&S.sel.k==='clip'?selObj():null;if(!c)return r;
+      const d=document.createElement('div');d.id='cpyBox';d.style.cssText='padding:4px 12px 14px';
+      d.innerHTML='<div class="h4">📋 نسخ ولصق المظهر</div><p class="hint">انسخ فلتر وتظبيط وتأثيرات المقطع ده والصقها على مقطع تاني أو كل المقاطع (من غير ما تأثر على الصوت أو القص).</p>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:6px"><button class="btn" id="cpyGet">📋 انسخ مظهر المقطع</button>'+
+        '<button class="btn" id="cpyOne"'+(clip?'':' disabled')+'>📌 الصق على المقطع ده</button>'+
+        '<button class="btn" id="cpyAll"'+(clip?'':' disabled')+'>📌 الصق على كل المقاطع</button></div>';
+      B.appendChild(d);
+      const apply=t=>{Object.keys(clip).forEach(k=>{t[k]=clip[k]})};
+      d.querySelector('#cpyGet').onclick=()=>{clip={};Object.keys(c).forEach(k=>{if(!SKIP.includes(k)&&k[0]!=='_')if(c[k]!==undefined)clip[k]=JSON.parse(JSON.stringify(c[k]))});toast('اتنسخ المظهر ✅');renderPanel()};
+      d.querySelector('#cpyOne').onclick=()=>{if(!clip)return;apply(c);dirty=true;commit();refreshAll();toast('اتلصق ✅')};
+      d.querySelector('#cpyAll').onclick=()=>{if(!clip)return;S.clips.forEach(x=>{if(assets[x.aid]&&assets[x.aid].type!=='audio')apply(x)});dirty=true;commit();refreshAll();toast('اتلصق على '+S.clips.length+' مقطع ✅')};
+    }catch(e){}
+    return r;
+  };
+})();
+
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
 (function(){
   const o=renderPanel;
