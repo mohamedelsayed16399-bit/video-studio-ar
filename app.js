@@ -1835,6 +1835,67 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   document.addEventListener('keydown',e=>{if(e.key==='Escape')ov.style.display='none'});
 })();
 
+/* ===== R71: project cleanup (cut silences in ALL clips + match loudness), analyze first then apply ===== */
+(function(){
+  const CL={norm:true,res:null,busy:false};
+  const fmt=t=>{t=Math.max(0,Math.round(t));return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')};
+  async function analyze(){
+    const out=[];
+    for(const c of S.clips){const a=assets[c.aid];if(!a||a.type!=='video'||c.mute){out.push({c,skip:true});continue}
+      let pcm=null;try{pcm=await clipPCM(c)}catch(e){}
+      if(!pcm||!pcm.length){out.push({c,skip:true});continue}
+      const F=320,n=Math.floor(pcm.length/F),th=SIL.th,voiced=[];let ve=0,vn=0;
+      for(let i=0;i<n;i++){let e=0;for(let j=0;j<F;j++){const v=pcm[i*F+j];e+=v*v}const db=10*Math.log10(e/F+1e-12);const v=db>th;voiced.push(v);if(v){ve+=e/F;vn++}}
+      const fs=F/16000,minF=Math.round(SIL.min/fs),pad=Math.round(.12/fs);
+      const segs=[];let st=-1;for(let i=0;i<=n;i++){if(i<n&&voiced[i]){if(st<0)st=i}else if(st>=0){segs.push([st,i]);st=-1}}
+      const mg=[];segs.forEach(sg=>{const l=mg[mg.length-1];if(l&&sg[0]-l[1]<minF)l[1]=sg[1];else mg.push([sg[0],sg[1]])});
+      const rng=mg.map(([x,y])=>[Math.max(0,x-pad)*fs,Math.min(n,y+pad)*fs]).filter(r=>r[1]-r[0]>.15);
+      const dur=c.out-c.in,keep=rng.reduce((t,r)=>t+r[1]-r[0],0);
+      out.push({c,rng,dur,keep,rms:vn?10*Math.log10(ve/vn):null,ok:rng.length>0&&dur-keep>=.3});
+    }
+    return out;
+  }
+  function apply(res,norm){
+    const rm=res.filter(r=>r.rms!=null).map(r=>r.rms),target=rm.length?Math.min(...rm):0;
+    const nc=[];
+    res.forEach(r=>{const c=r.c;
+      if(r.skip||!r.ok){nc.push(c);}
+      else r.rng.forEach((g,k)=>nc.push(Object.assign({},c,{id:k?uid():c.id,in:c.in+g[0],out:Math.min(c.out,c.in+g[1]),trans:k?'none':c.trans})));
+      if(norm&&r.rms!=null){const gain=Math.min(1,Math.pow(10,(target-r.rms)/20));
+        const lastN=r.skip||!r.ok?1:r.rng.length;for(let q=nc.length-lastN;q<nc.length;q++)nc[q].vol=Math.max(5,Math.round((nc[q].vol||100)*gain))}
+    });
+    S.clips=nc;S.sel=null;layout();commit();refreshAll();seekTo(0);dirty=true;
+  }
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='media')return r;
+      const d=document.createElement('div');d.id='clBox';d.style.cssText='padding:4px 12px 14px';
+      const R=CL.res;let sum='';
+      if(R){const tot=R.reduce((n,x)=>n+(x.c.out-x.c.in),0),after=R.reduce((n,x)=>n+(x.ok?x.keep:(x.c.out-x.c.in)),0);
+        sum='<div style="background:#12151f;border:1px solid #2a3047;border-radius:8px;padding:8px;margin:8px 0;font-size:13px"><b>النتيجة المتوقعة:</b> '+fmt(tot)+' ← '+fmt(after)+' (هيتحذف '+fmt(tot-after)+')'+
+          R.map((x,i)=>'<div style="opacity:.85">مقطع '+(i+1)+': '+(x.skip?'من غير تحليل':x.ok?('يتقص '+(x.dur-x.keep).toFixed(1)+'ث، '+x.rng.length+' جزء'+(x.rms!=null?' ، '+Math.round(x.rms)+' dB':'')):'مفيش صمت كفاية')+'</div>').join('')+'</div>'+
+          '<button class="btn primary" id="clGo" style="margin-bottom:6px">✅ طبّق التنضيف</button>'}
+      d.innerHTML='<div class="h4">🧹 تنضيف المشروع (صمت + مستوى الصوت)</div><p class="hint">بيحلل كل مقاطع الفيديو، يقص الصمت منها كلها مرة واحدة، ويوازن مستوى الصوت بين المقاطع. بتشوف النتيجة قبل التطبيق.</p>'+
+        '<div class="fld"><label>حساسية الصوت <b>'+SIL.th+' dB</b></label><input type="range" id="clTh" min="-60" max="-20" step="1" value="'+SIL.th+'"></div>'+
+        '<div class="fld"><label>أقل مدة صمت تتحذف <b>'+SIL.min+'ث</b></label><input type="range" id="clMin" min="0.2" max="2" step="0.05" value="'+SIL.min+'"></div>'+
+        '<label style="display:flex;gap:6px;align-items:center;margin:6px 0"><input type="checkbox" id="clNorm"'+(CL.norm?' checked':'')+'> وازن مستوى الصوت بين المقاطع</label>'+
+        '<button class="btn" id="clScan">🔎 حلّل المشروع</button>'+sum;
+      B.appendChild(d);
+      d.querySelector('#clTh').addEventListener('input',e=>{SIL.th=+e.target.value;e.target.previousElementSibling.querySelector('b').textContent=SIL.th+' dB';CL.res=null});
+      d.querySelector('#clMin').addEventListener('input',e=>{SIL.min=+e.target.value;e.target.previousElementSibling.querySelector('b').textContent=SIL.min+'ث';CL.res=null});
+      d.querySelector('#clNorm').addEventListener('change',e=>{CL.norm=e.target.checked});
+      d.querySelector('#clScan').onclick=async()=>{if(CL.busy)return;if(!S.clips.length){toast('ضيف مقاطع الأول');return}
+        CL.busy=true;const b=d.querySelector('#clScan');b.disabled=true;b.textContent='بحلل...';
+        try{CL.res=await analyze()}catch(e){toast('معرفتش أحلل الصوت');CL.res=null}
+        CL.busy=false;renderPanel()};
+      const g=d.querySelector('#clGo');if(g)g.onclick=()=>{if(!CL.res)return;const n=CL.res.length;apply(CL.res,CL.norm);CL.res=null;toast('اتنضّف المشروع ✅ (تقدر تتراجع بضغطة)',4500)};
+    }catch(e){}
+    return r;
+  };
+})();
+
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
 (function(){
   const o=renderPanel;
