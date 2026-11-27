@@ -502,6 +502,7 @@ function panelFx(){
   const c=S.sel&&S.sel.k==='clip'?selObj():null;
   if(!c)return`<p class="hint">اختار مقطع من الخط الزمني عشان تعدل المؤثرات والسرعة والصوت.</p>`;
   const a=assets[c.aid]||{};
+  if(c.pz==null)c.pz=0;if(c.pi==null)c.pi=3;
   let h=`<div class="h4">فلاتر</div><div class="presets">${Object.entries(PRESETS).map(([k,p])=>`<button data-act="preset-fx" data-p="${k}" class="${c.preset===k?'on':''}"><canvas width="96" height="60" data-pp="${k}"></canvas>${p.n}</button>`).join('')}</div>`;
   h+=`<div class="h4">ضبط الصورة</div>${sld(c,'b','السطوع',30,200,1,'%')}${sld(c,'c','التباين',30,200,1,'%')}${sld(c,'s','التشبع',0,250,1,'%')}${sld(c,'h','تدرج اللون',-180,180,1,'°')}${sld(c,'temp','حرارة اللون (بارد ↔ دافئ)',-100,100,1)}${sld(c,'tint','تينت (أخضر ↔ وردي)',-100,100,1)}${sld(c,'bl','تمويه',0,20,.5,'px')}${chk(c,'vig','تعتيم الأطراف')}`;
   h+=`<div class="h4">⭕ شكل القناع</div><div class="presets" style="grid-template-columns:repeat(3,1fr)">${[['none','بدون'],['circle','دايرة'],['square','مربع مدوّر'],['wide','مستطيل'],['diamond','معيّن'],['heart','قلب']].map(([v,n])=>`<button data-act="mask" data-v="${v}" class="${(c.mask||'none')===v?'on':''}" style="padding:9px 2px;font-size:12px">${n}</button>`).join('')}</div>${c.mask&&c.mask!=='none'?sld(c,'msz','حجم القناع',20,140,1,'%')+sld(c,'mx','إزاحة القناع أفقي',-50,50,1,'%')+sld(c,'my','إزاحة القناع رأسي',-50,50,1,'%'):''}`;
