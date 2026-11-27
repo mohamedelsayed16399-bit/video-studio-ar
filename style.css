@@ -25,11 +25,12 @@ main{flex:1;min-height:0;display:grid;grid-template-columns:1fr 360px;grid-templ
 #transport{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 #tc{font-variant-numeric:tabular-nums;color:var(--mu);direction:ltr;padding:0 6px}
 .play{background:var(--ac);border-color:var(--ac)}
-#panel{grid-area:panel;background:var(--p1);border-inline-start:1px solid #262b3b;display:flex;flex-direction:column;min-height:0}
+#panel{grid-area:panel;background:var(--p1);border-inline-start:1px solid #262b3b;display:flex;flex-direction:column;min-height:0;overflow-y:auto}
 #tabs{display:flex;overflow-x:auto;flex:none;border-bottom:1px solid #262b3b;scrollbar-width:none}
 #tabs button{border:0;border-radius:0;background:none;white-space:nowrap;padding:10px 12px;color:var(--mu);border-bottom:3px solid transparent}
 #tabs button.on{color:#fff;border-bottom-color:var(--ac);background:var(--p2)}
-#tabBody{overflow:auto;padding:12px;flex:1;min-height:0}
+#tabBody{overflow:visible;padding:12px;flex:none}
+#panel>#tabs{position:sticky;top:0;z-index:5;background:var(--p1)}
 .fld{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
 .fld>label,.lbl{color:var(--mu);font-size:12px;display:flex;justify-content:space-between}
 .fld b{color:var(--tx);font-weight:700}
