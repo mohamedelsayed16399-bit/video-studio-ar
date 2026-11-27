@@ -2008,6 +2008,63 @@ function ovMotion(ov,lt,d){
     return r;
   };
 })();
+/* ===== R75: edit video by editing the transcript (tick caption lines, cut them out of the video, everything after moves up) ===== */
+(function(){
+  const TE={sel:new Set()};
+  const FILL=/^[\s\.\,،؟?!\-…]*((اا+ه?|ام+|ا?ممم*|اه+|ايه|يعني|اعني|كده|طب|آه|اه|um+|uh+|er+|ah+|hmm+|like|you know)[\s\.\,،؟?!\-…]*)+$/i;
+  const isFill=t=>FILL.test((t||'').trim())&&(t||'').trim().length<14;
+  function cutRange(a,b){
+    layout();const nc=[],d=b-a;let skipped=0;
+    S.clips.forEach(c=>{const cs=c._s,ce=cs+cdur(c);
+      if(ce<=a+1e-6||cs>=b-1e-6){nc.push(c);return}
+      if(c.ramp){skipped++;nc.push(c);return}
+      const sp=c.speed||1;
+      if(a>cs+.04)nc.push(Object.assign({},c,{out:c.in+(a-cs)*sp}));
+      if(b<ce-.04)nc.push(Object.assign({},c,{id:uid(),in:c.in+(b-cs)*sp,trans:'none',kf:c.kf}));
+    });
+    S.clips=nc;layout();
+    const sh=v=>v>=b?v-d:Math.min(v,a);
+    S.subs.forEach(s=>{s.s=sh(s.s);s.e=sh(s.e)});S.subs=S.subs.filter(s=>s.e-s.s>.05);
+    S.texts.forEach(x=>{x.start=sh(x.start);x.end=Math.max(x.start+.2,sh(x.end))});
+    S.overlays.forEach(x=>{x.start=sh(x.start);x.end=Math.max(x.start+.2,sh(x.end))});
+    S.audios.forEach(x=>{x.start=x.start>=b?x.start-d:x.start});
+    return skipped;
+  }
+  function doCut(){
+    const ids=[...TE.sel],items=S.subs.filter(s=>ids.includes(s.id)).sort((x,y)=>y.s-x.s);if(!items.length)return null;
+    const rng=items.map(s=>[s.s,s.e]);let skipped=0,gone=0;
+    const oc=commit;commit=function(){};
+    try{
+      rng.forEach(([a,b])=>{
+        // remove the caption itself first so it is not clamped around
+        S.subs=S.subs.filter(s=>!(Math.abs(s.s-a)<1e-6&&Math.abs(s.e-b)<1e-6));
+        skipped+=cutRange(a,b);gone+=b-a});
+    }finally{commit=oc}
+    TE.sel.clear();S.sel=null;commit();refreshAll();seekTo(0);dirty=true;
+    return{n:items.length,gone,skipped};
+  }
+  window.__teCut=doCut;window.__teSel=TE.sel;
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='subs')return r;
+      const d=document.createElement('div');d.id='teBox';d.style.cssText='padding:4px 12px 14px';
+      const subs=S.subs.slice().sort((a,b)=>a.s-b.s),tot=subs.filter(s=>TE.sel.has(s.id)).reduce((n,s)=>n+(s.e-s.s),0);
+      d.innerHTML='<div class="h4">✂ المونتاج من النص</div><p class="hint">علّم السطور اللي مش عايزها واضغط قص: الجزء ده بيتشال من الفيديو والباقي بيتقدّم. تقدر تتراجع (Undo). يشتغل على الترجمة الموجودة (تلقائية أو من سكريبت).</p>'+
+        (subs.length?'<div style="display:flex;gap:6px;margin-bottom:6px"><button class="btn" id="teFill">🧹 علّم الحشو (اااا / يعني / ايه)</button><button class="btn" id="teNone">إلغاء التعليم</button></div>'+
+        '<div style="max-height:260px;overflow:auto;border:1px solid #2a3047;border-radius:8px">'+subs.map(s=>'<label data-te="'+s.id+'" style="display:flex;gap:8px;align-items:center;padding:6px 8px;border-bottom:1px solid #1d2233;cursor:pointer;'+(TE.sel.has(s.id)?'background:#3a1b2a;text-decoration:line-through;opacity:.8':'')+'"><input type="checkbox" '+(TE.sel.has(s.id)?'checked':'')+'><span style="font-size:11px;opacity:.6;min-width:42px">'+s.s.toFixed(1)+'s</span><span style="flex:1">'+esc(s.t||'')+'</span></label>').join('')+'</div>'+
+        '<button class="btn pri" id="teGo" style="width:100%;margin-top:8px"'+(TE.sel.size?'':' disabled')+'>✂ قص '+TE.sel.size+' سطر من الفيديو ('+tot.toFixed(1)+' ث)</button>'
+        :'<p class="hint">مفيش ترجمة لسه. اعمل ترجمة تلقائية أو من سكريبت الأول.</p>');
+      B.appendChild(d);
+      d.querySelectorAll('[data-te]').forEach(l=>{const cb=l.querySelector('input');cb.onchange=()=>{const id=l.dataset.te;cb.checked?TE.sel.add(id):TE.sel.delete(id);const rp=B.scrollTop;renderPanel();B.scrollTop=rp};l.querySelector('span').onclick=e=>{e.preventDefault();const s=S.subs.find(x=>x.id===l.dataset.te);if(s)seekTo(s.s+.01)}});
+      const f=d.querySelector('#teFill');if(f)f.onclick=()=>{S.subs.forEach(s=>{if(isFill(s.t))TE.sel.add(s.id)});renderPanel()};
+      const n=d.querySelector('#teNone');if(n)n.onclick=()=>{TE.sel.clear();renderPanel()};
+      const g=d.querySelector('#teGo');if(g)g.onclick=()=>{doCut()};
+    }catch(e){console.error('te',e)}
+    return r;
+  };
+})();
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
 (function(){
   const o=renderPanel;
