@@ -1313,3 +1313,54 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
     d.querySelector('#sbTrim').onclick=()=>{S.subs.forEach(s=>{s.t=String(s.t).replace(/[ \t]+/g,' ').replace(/\n{2,}/g,'\n').trim()});dirty=true;commit();refreshAll();toast('اتنضفت الترجمة ✅')};
   };
 })();
+
+/* ===== R51: keyframe animation (position, zoom, rotation, opacity over time) ===== */
+(function(){
+  const ease=x=>x*x*(3-2*x);
+  function kfAt(c,lt){
+    const k=c.kf;if(!k||!k.length)return null;const L=k;
+    if(lt<=L[0].t)return L[0];if(lt>=L[L.length-1].t)return L[L.length-1];
+    let i=0;while(i<L.length-1&&L[i+1].t<lt)i++;
+    const a=L[i],b=L[i+1],u0=(lt-a.t)/Math.max(1e-6,b.t-a.t),u=c.kfe==='lin'?u0:ease(u0);
+    const m=(x,y)=>x+(y-x)*u;
+    return{px:m(a.px,b.px),py:m(a.py,b.py),zoom:m(a.zoom,b.zoom),rot:m(a.rot,b.rot),op:m(a.op,b.op)};
+  }
+  let kfC=null;
+  const orig=drawClipLayer;
+  drawClipLayer=function(ctx,c,a,w,h,t){
+    if(!c.kf||!c.kf.length)return orig.apply(this,arguments);
+    const lt=clamp(t-c._s,0,cdur(c)),v=kfAt(c,lt);
+    const cc=Object.assign({},c,{px:v.px,py:v.py,zoom:v.zoom,rot:(c.rot||0)+v.rot/90});
+    if(v.op>=99.5)return orig.call(this,ctx,cc,a,w,h,t);
+    if(!kfC)kfC=document.createElement('canvas');if(kfC.width!==w||kfC.height!==h){kfC.width=w;kfC.height=h}
+    const x=kfC.getContext('2d');x.setTransform(1,0,0,1,0,0);x.globalAlpha=1;x.globalCompositeOperation='source-over';x.clearRect(0,0,w,h);
+    orig.call(this,x,cc,a,w,h,t);
+    ctx.save();ctx.globalAlpha=Math.max(0,v.op/100);ctx.drawImage(kfC,0,0);ctx.restore();
+  };
+  window.__kfAt=kfAt;
+  let sel=0;
+  const origP=renderPanel;
+  renderPanel=function(){origP.apply(this,arguments);
+    if(S.tab!=='fx')return;const c=S.sel&&S.sel.k==='clip'?selObj():null;if(!c)return;
+    const B=document.getElementById('panel');if(!B)return;{const o=B.querySelector('#kfBox');if(o)o.remove()}
+    const L=c.kf||(c.kf=[]);if(sel>=L.length)sel=Math.max(0,L.length-1);
+    const lt=clamp(S.playhead-c._s,0,cdur(c));
+    const d=document.createElement('div');d.id='kfBox';d.style.cssText='padding:4px 12px 14px';
+    const cur=L[sel];
+    const row=(k,lab,min,max,step,u)=>cur?'<div class="fld"><label>'+lab+' <b>'+(+cur[k]).toFixed(k==='zoom'||k==='op'||k==='rot'?0:1)+u+'</b></label><input type="range" data-kv="'+k+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+cur[k]+'"></div>':'';
+    d.innerHTML='<div class="h4">🎬 كي فريم (حركة على المقطع)</div><p class="hint">ضيف نقطة عند أي وقت وغيّر الموضع والزووم والدوران والشفافية، والمقطع بيتحرك بينهم لوحده. لما تضيف كي فريم، سلايدرات الموضع والزووم العادية بتتجاهل.</p>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"><button class="btn" id="kfAdd">＋ كي فريم عند المؤشر</button>'+(L.length?'<button class="btn" id="kfDel">🗑 احذف المحدد</button><button class="btn" id="kfClr">مسح الكل</button>':'')+'</div>'+
+      (L.length?'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'+L.map((k,i)=>'<button class="btn'+(i===sel?' on':'')+'" data-kfi="'+i+'" style="'+(i===sel?'outline:2px solid #7c5cff':'')+'">'+k.t.toFixed(1)+'ث</button>').join('')+'</div>':'')+
+      row('px','أفقي',-100,100,1,'%')+row('py','رأسي',-100,100,1,'%')+row('zoom','زووم',20,400,1,'%')+row('rot','دوران',-180,180,1,'°')+row('op','شفافية',0,100,1,'%')+
+      (L.length>1?'<div class="fld"><label>نعومة الحركة</label><select id="kfE"><option value="ease"'+(c.kfe!=='lin'?' selected':'')+'>ناعمة</option><option value="lin"'+(c.kfe==='lin'?' selected':'')+'>خطية</option></select></div>':'');
+    B.appendChild(d);
+    d.querySelector('#kfAdd').onclick=()=>{const lt=clamp(S.playhead-c._s,0,cdur(c));const v=kfAt(c,lt)||{px:c.px||0,py:c.py||0,zoom:c.zoom||100,rot:0,op:100};const t=+lt.toFixed(2);const ex=L.findIndex(k=>Math.abs(k.t-t)<.05);
+      if(ex>=0){sel=ex}else{L.push({t,px:v.px,py:v.py,zoom:v.zoom,rot:v.rot,op:v.op});L.sort((a,b)=>a.t-b.t);sel=L.findIndex(k=>k.t===t)}
+      dirty=true;commit();refreshAll()};
+    const del=d.querySelector('#kfDel');if(del)del.onclick=()=>{L.splice(sel,1);sel=0;dirty=true;commit();refreshAll()};
+    const clr=d.querySelector('#kfClr');if(clr)clr.onclick=()=>{c.kf=[];sel=0;dirty=true;commit();refreshAll()};
+    d.querySelectorAll('[data-kfi]').forEach(b=>b.onclick=()=>{sel=+b.dataset.kfi;seekTo(c._s+L[sel].t);renderPanel()});
+    d.querySelectorAll('[data-kv]').forEach(el=>el.addEventListener('input',()=>{cur[el.dataset.kv]=+el.value;el.previousElementSibling.querySelector('b').textContent=el.value+(el.dataset.kv==='rot'?'°':'%');dirty=true;commit()}));
+    const e=d.querySelector('#kfE');if(e)e.onchange=()=>{c.kfe=e.value;dirty=true;commit();refreshAll()};
+  };
+})();
