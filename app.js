@@ -1568,6 +1568,41 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   };
 })();
 
+/* ===== R58: project template gallery (one click look for the whole project) ===== */
+(function(){
+  const TG=[
+    {n:'📱 ريلز حيوي',d:'9:16 + ألوان حيوية + انتقال وميض + عنوان',as:'9:16',pr:'vivid',tr:'flashw',td:.3,kb:6,vig:false,fio:[.2,.4,'b'],ti:'عنوان الريل',to:{y:.2,size:11,anim:'pop',color:'#ffe14d',bgOn:false}},
+    {n:'🎞 سينمائي',d:'16:9 + تيل وبرتقاني + فيد طويل + تظليل الأطراف',as:'16:9',pr:'teal',tr:'fade',td:.8,kb:0,vig:true,fio:[1,1.5,'b'],ti:'عنوان الفيلم',to:{y:.5,size:10,anim:'rise',color:'#ffffff',bgOn:false}},
+    {n:'☀ فلوج دافئ',d:'16:9 + ألوان دافئة + انتقال تلاشي + زووم هادي',as:'16:9',pr:'warm',tr:'dip',td:.5,kb:10,vig:false,fio:[.3,.6,'b'],ti:'يومي معاكم',to:{y:.85,size:8,anim:'pop',color:'#ffffff',bgOn:true,bg:'#e65100'}},
+    {n:'⚡ تيك توك سريع',d:'9:16 + نيون + انتقال جليتش + زووم',as:'9:16',pr:'neon',tr:'glitcht',td:.3,kb:12,vig:false,fio:[0,.3,'b'],ti:'شوف للآخر 👀',to:{y:.15,size:10,anim:'blink',color:'#ffffff',bgOn:true,bg:'#e53935'}},
+    {n:'📷 إنستجرام قديم',d:'4:5 + شكل قديم + انتقال مقسوم',as:'4:5',pr:'vintage',tr:'split',td:.5,kb:6,vig:true,fio:[.4,.6,'b'],ti:'ذكريات',to:{y:.88,size:9,anim:'drop',color:'#fff3c4',bgOn:false}},
+    {n:'🖤 أبيض وأسود درامي',d:'16:9 + نوار + تظليل + فيد',as:'16:9',pr:'noir',tr:'fade',td:.7,kb:0,vig:true,fio:[.8,1.2,'b'],ti:'',to:{}}
+  ];
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='media')return r;
+      const d=document.createElement('div');d.id='tgBox';d.style.cssText='padding:4px 12px 14px';
+      d.innerHTML='<div class="h4">🖼 قوالب جاهزة للمشروع كله</div><p class="hint">ضغطة واحدة تظبط الأبعاد والألوان والانتقالات والفيد وعنوان. تقدر تتراجع (Undo).</p>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+TG.map((t,i)=>'<button class="btn" data-tg="'+i+'" style="text-align:right;padding:8px"><b>'+t.n+'</b><br><span style="font-size:11px;opacity:.7">'+t.d+'</span></button>').join('')+'</div>';
+      B.appendChild(d);
+      d.querySelectorAll('[data-tg]').forEach(b=>b.onclick=()=>{
+        if(!S.clips.length){toast('ضيف مقاطع الأول');return}
+        const t=TG[+b.dataset.tg];
+        S.aspect=t.as;setCanvasSize(quality);
+        S.clips.forEach((c,i)=>{c.preset=t.pr;c.vig=t.vig;c.kb=t.kb;c.trans=i?t.tr:'none';c.transD=t.td});
+        const F=S.subStyle.fio||(S.subStyle.fio={i:0,o:0,c:'b'});F.i=t.fio[0];F.o=t.fio[1];F.c=t.fio[2];
+        S.texts=S.texts.filter(x=>!x._tpl);
+        layout();
+        if(t.ti){const x=addText(t.ti);Object.assign(x,t.to,{start:.3,end:Math.min(3,total),_tpl:1})}
+        S.tab='media';commit();refreshAll();seekTo(0);toast('اتطبق قالب '+t.n+' ✅',3500);
+      });
+    }catch(e){}
+    return r;
+  };
+})();
+
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
 (function(){
   const o=renderPanel;
