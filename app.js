@@ -1680,6 +1680,59 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   };
 })();
 
+/* ===== R67: script to captions (paste text, auto timing: even or only where someone speaks) ===== */
+(function(){
+  const SC={txt:'',mode:'voice',max:42};
+  async function voicedSpans(){
+    const sp=[];
+    for(const c of S.clips){const a=assets[c.aid];if(!a||a.type!=='video'||c.mute)continue;
+      let pcm=null;try{pcm=await clipPCM(c)}catch(e){}
+      if(!pcm||!pcm.length){sp.push([c._s,c._s+cdur(c)]);continue}
+      const F=320,n=Math.floor(pcm.length/F),fs=F/16000,sc=1/(c.speed||1);let st=-1;const loc=[];
+      for(let i=0;i<=n;i++){let v=false;if(i<n){let e=0;for(let j=0;j<F;j++){const x=pcm[i*F+j];e+=x*x}v=10*Math.log10(e/F+1e-12)>SIL.th}
+        if(v){if(st<0)st=i}else if(st>=0){loc.push([st*fs*sc,i*fs*sc]);st=-1}}
+      const mg=[];loc.forEach(r=>{const l=mg[mg.length-1];if(l&&r[0]-l[1]<.5)l[1]=r[1];else mg.push([r[0],r[1]])});
+      mg.filter(r=>r[1]-r[0]>.2).forEach(r=>sp.push([c._s+r[0],Math.min(c._s+cdur(c),c._s+r[1])]));
+    }
+    return sp;
+  }
+  function lines(txt){
+    return txt.split(/\n+/).flatMap(l=>{l=l.trim();if(!l)return[];const parts=l.split(/(?<=[.!?؟…])\s+/);return parts.map(x=>x.trim()).filter(Boolean)});
+  }
+  async function build(){
+    const L=lines(SC.txt);if(!L.length){toast('اكتب النص الأول');return null}
+    if(!(total>0)){toast('ضيف مقاطع الأول');return null}
+    let spans=SC.mode==='voice'?await voicedSpans():[];
+    if(!spans.length)spans=[[0,total]];
+    const V=spans.reduce((n,r)=>n+r[1]-r[0],0),W=L.map(l=>Math.max(4,l.length)),tw=W.reduce((a,b)=>a+b,0);
+    const at=v=>{let acc=0;for(const r of spans){const d=r[1]-r[0];if(v<=acc+d+1e-9)return r[0]+Math.max(0,v-acc);acc+=d}return spans[spans.length-1][1]};
+    const out=[];let cum=0;
+    L.forEach((l,i)=>{const s=at(cum/tw*V);cum+=W[i];const e=at(cum/tw*V);
+      splitLong({id:uid(),s,e:Math.max(e,s+.4),t:l},SC.max).forEach(x=>out.push(x))});
+    return out;
+  }
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='subs')return r;
+      const d=document.createElement('div');d.id='scBox';d.style.cssText='padding:4px 12px 14px';
+      d.innerHTML='<div class="h4">📝 ترجمة من نص مكتوب</div><p class="hint">الصق النص أو السكربت (سطر أو جملة في كل ترجمة). التطبيق بيوزّع الوقت لوحده.</p>'+
+        '<textarea id="scTxt" rows="5" style="width:100%" placeholder="اكتب أو الصق النص هنا...">'+esc(SC.txt)+'</textarea>'+
+        '<div class="fld"><label>التوقيت</label><select id="scMode"><option value="voice"'+(SC.mode==='voice'?' selected':'')+'>على أماكن الكلام بس (يتجاهل الصمت)</option><option value="even"'+(SC.mode==='even'?' selected':'')+'>موزّع بالتساوي على المشروع كله</option></select></div>'+
+        '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn primary" id="scGo">📝 اعمل الترجمة</button></div>';
+      B.appendChild(d);
+      d.querySelector('#scTxt').addEventListener('input',e=>{SC.txt=e.target.value});
+      d.querySelector('#scMode').addEventListener('change',e=>{SC.mode=e.target.value});
+      d.querySelector('#scGo').onclick=async()=>{const b=d.querySelector('#scGo');b.disabled=true;b.textContent='بحسب التوقيت...';
+        try{const out=await build();if(out){S.subs=out.sort((a,b)=>a.s-b.s);commit();S.sel=null;renderTL();dirty=true;toast('اتعمل '+out.length+' ترجمة ✅ (بدّلت الترجمات القديمة)',4500)}}
+        catch(e){toast('حصل خطأ في التوقيت')}finally{b.disabled=false;b.textContent='📝 اعمل الترجمة'}};
+    }catch(e){}
+    return r;
+  };
+  window.__scBuild=build;
+})();
+
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
 (function(){
   const o=renderPanel;
