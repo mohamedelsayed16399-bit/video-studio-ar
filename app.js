@@ -296,6 +296,7 @@ function drawFrame(ctx,w,h,t,opt={}){
     else if(tx.anim==='drop'){const k=Math.min(1,lt/.55);dy=-(1-k)*(1-k)*h*.4;alpha=Math.min(1,lt/.1,(d-lt)/.25);if(k>.85&&k<1)sc=1+.08*Math.sin((k-.85)/.15*Math.PI)}
     else if(tx.anim==='type'){txt=[...tx.text].slice(0,Math.ceil([...tx.text].length*Math.min(1,lt/(d*.55)))).join('')}
     if(!txt)return;
+    if(tx.anim&&tx.anim.indexOf('k_')===0){drawKinetic(ctx,w,h,tx,lt,d);return}
     drawCaption(ctx,w,h,txt,tx.x*w+xo,tx.y*h,tx.size,tx.color,tx.bgOn?tx.bg:null,{alpha:alpha*(tx._op==null?1:tx._op),sc,dy,weight:tx.weight,stc:tx.stc,stw:tx.stw,glow:tx.glow});
   });
   if(opt.subs!==false&&S.subStyle.burn){
@@ -477,7 +478,7 @@ function panelText(){
   h+=`<div class="r2"><div class="fld"><label>يبدأ (ثانية)</label><input type="number" step="0.1" min="0" data-o="text" data-k="start" value="${tx.start.toFixed(1)}"></div><div class="fld"><label>ينتهي (ثانية)</label><input type="number" step="0.1" min="0" data-o="text" data-k="end" value="${tx.end.toFixed(1)}"></div></div>`;
   h+=sld(tx,'size','الحجم',2,30,.5,'%')+sld(tx,'x','أفقي',0,1,.01)+sld(tx,'y','رأسي',0,1,.01);
   h+=`<div class="r3">${clr(tx,'color','لون النص')}${clr(tx,'bg','لون الخلفية')}${chk(tx,'bgOn','خلفية')}</div>`;
-  h+=sel_(tx,'anim','الحركة',[['none','بدون'],['fade','ظهور تدريجي'],['pop','بوب'],['slide','انزلاق'],['type','كتابة'],['words','كلمة كلمة'],['zoom','زووم داخل'],['bounce','نطّ'],['float','طفو'],['marquee','شريط متحرك'],['rise','طلوع'],['shake','اهتزاز'],['blink','وميض'],['drop','سقوط']]);
+  h+=sel_(tx,'anim','الحركة',[['none','بدون'],['fade','ظهور تدريجي'],['pop','بوب'],['slide','انزلاق'],['type','كتابة'],['words','كلمة كلمة'],['zoom','زووم داخل'],['bounce','نطّ'],['float','طفو'],['marquee','شريط متحرك'],['rise','طلوع'],['shake','اهتزاز'],['blink','وميض'],['drop','سقوط'],['k_wave','🌊 موجة'],['k_cascade','⬇ شلال'],['k_wordpop','💥 كلمة كلمة'],['k_rgb','📺 جليتش RGB'],['k_spin','🔄 قلب'],['k_oneword','🎯 كلمة واحدة'],['k_hl','🖍 تمييز']]);
   h+=sel_(tx,'weight','السُمك',[[400,'عادي'],[700,'عريض'],[900,'عريض جداً']]);
   return h;
 }
@@ -1914,6 +1915,62 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   };
 })();
 
+/* ===== R73: kinetic text styles (per word / per letter) + animated gallery ===== */
+const KX=[['k_wave','🌊 موجة','حروف/كلمات بتتمايل'],['k_cascade','⬇ شلال','تنزل واحدة واحدة وترتد'],['k_wordpop','💥 كلمة كلمة','كل كلمة تطلع بوب'],['k_rgb','📺 جليتش RGB','انفصال ألوان ورعشة'],['k_spin','🔄 قلب','تتقلب وتظهر بالتتابع'],['k_oneword','🎯 كلمة واحدة','كلمة كبيرة في المرة (ريلز)'],['k_hl','🖍 تمييز','كلمة مضيئة بتتحرك']];
+function drawKinetic(ctx,w,h,tx,lt,d){
+  const fs=Math.max(8,Math.round(tx.size/100*h)),an=tx.anim;ctx.save();
+  ctx.font=`${tx.weight||700} ${fs}px ${FONT}`;const rtl=/[\u0600-\u06FF]/.test(tx.text);ctx.textAlign='center';ctx.textBaseline='middle';ctx.direction=rtl?'rtl':'ltr';
+  const lines=wrapText(ctx,tx.text,w*.88),lh=fs*1.38,sp=ctx.measureText(' ').width,wordMode=rtl||an==='k_wordpop'||an==='k_oneword'||an==='k_hl';
+  const U=[];let cnt=0,N=0;
+  lines.forEach((l,li)=>{const ws=l.split(' ').filter(Boolean),items=[];
+    ws.forEach((wv,j)=>{if(wordMode){items.push({s:wv,w:ctx.measureText(wv).width,k:cnt++})}else[...wv].forEach(ch=>items.push({s:ch,w:ctx.measureText(ch).width,k:cnt++}));
+      if(j<ws.length-1)items.push({gap:sp})});
+    if(rtl)items.reverse();
+    const tw=items.reduce((a,b)=>a+(b.gap||b.w),0);let x=-tw/2;
+    items.forEach(it=>{if(it.gap){x+=it.gap;return}U.push({s:it.s,x:x+it.w/2,y:(li-(lines.length-1)/2)*lh,w:it.w,k:it.k});x+=it.w})});
+  N=cnt;if(!N){ctx.restore();return}
+  const al=(tx._op==null?1:tx._op)*Math.min(1,(d-lt)/.3),cx=tx.x*w,cy=tx.y*h,bw=Math.max(...U.map(u=>Math.abs(u.x)+u.w/2))*2,bh=lines.length*lh;
+  if(tx.bgOn){ctx.globalAlpha=al*Math.min(1,lt/.2);ctx.fillStyle=tx.bg;rrect(ctx,cx-bw/2-fs*.45,cy-bh/2-fs*.12,bw+fs*.9,bh+fs*.24,fs*.32);ctx.fill()}
+  ctx.lineJoin='round';ctx.lineWidth=fs*.14;ctx.strokeStyle='rgba(0,0,0,.9)';
+  const dr=(u,o)=>{ctx.save();ctx.globalAlpha=al*(o.a==null?1:o.a);if(ctx.globalAlpha<=0.003){ctx.restore();return}
+    ctx.translate(cx+(o.x==null?u.x:o.x)+(o.dx||0),cy+(o.y==null?u.y:o.y)+(o.dy||0));if(o.r)ctx.rotate(o.r);ctx.scale(o.sx==null?1:o.sx,o.sy==null?(o.sx==null?1:o.sx):o.sy);
+    if(tx.glow){ctx.shadowColor=tx.glow;ctx.shadowBlur=fs*.5}
+    if(!tx.bgOn&&!o.nos)ctx.strokeText(u.s,0,0);ctx.fillStyle=o.c||tx.color;ctx.fillText(u.s,0,0);ctx.restore()};
+  const cl=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+  if(an==='k_oneword'){const i=Math.min(N-1,Math.floor(lt/d*N)),q=lt/d*N-i,u=U.find(z=>z.k===i);if(u)dr(u,{x:0,y:0,sx:(1+.35*(1-easeOut(cl(q*5))))*1.25,a:cl(q*8)});ctx.restore();return}
+  U.forEach(u=>{const k=u.k;
+    if(an==='k_wave')dr(u,{dy:Math.sin(lt*5-k*.6)*fs*.18,a:cl(lt/.3)});
+    else if(an==='k_cascade'){const p=cl((lt-k*.05)/.5);dr(u,{dy:-(1-easeOut(p))*(1-easeOut(p))*h*.25-Math.abs(Math.sin(p*Math.PI*2))*(1-p)*fs*.3,a:cl(p*4)})}
+    else if(an==='k_wordpop'){const p=cl((lt-k*.22)/.3);dr(u,{sx:Math.max(.01,easeBack(p)),a:cl(p*5)})}
+    else if(an==='k_spin'){const p=cl((lt-k*.07)/.45);dr(u,{sx:Math.max(.02,Math.abs(Math.cos((1-easeOut(p))*Math.PI/2))),sy:1,r:(1-easeOut(p))*.4,a:p>0?1:0})}
+    else if(an==='k_hl'){const act=Math.min(N-1,Math.floor(lt/(d*.9)*N))===k;dr(u,{c:act?'#ffe14d':tx.color,sx:act?1.18:1,dy:act?-fs*.08:0,a:cl(lt/.2)})}
+    else if(an==='k_rgb'){const fr=Math.floor(lt*20),off=fs*.05*(.5+rnd(fr,3)),big=rnd(fr,5)>.88?3:1,j=(rnd(fr,9)-.5)*fs*.06*big;
+      ctx.save();ctx.globalAlpha=.85;dr(u,{c:'#ff2d55',dx:-off*big+j,nos:1,a:cl(lt/.2)});dr(u,{c:'#00e5ff',dx:off*big+j,nos:1,a:cl(lt/.2)});ctx.restore();dr(u,{dx:j*.5,a:cl(lt/.2)})}
+  });
+  ctx.restore();
+}
+(function(){
+  const SAMPLE='ابدأ فيديو جديد النهاردة';
+  function addKx(a){const oc=commit;commit=function(){};let x;try{x=addText('اكتب نصك هنا بالحركة');x.anim=a;x.size=8;x.end=x.start+3.5}finally{commit=oc}commit();refreshAll()}
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='text')return r;
+      const d=document.createElement('div');d.id='kxBox';d.style.cssText='padding:4px 12px 14px';
+      d.innerHTML='<div class="h4">🎬 ستايلات نص متحركة (حرف/كلمة)</div><p class="hint">المعاينة شغالة. اضغط ستايل يتضاف نص جديد عند المؤشر، أو اختار "الحركة" من إعدادات أي نص. الحروف العربي بتتحرك ككلمات عشان تفضل متصلة، والإنجليزي حرف حرف.</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+
+        KX.map((k,i)=>'<button class="btn" data-kx="'+i+'" style="text-align:right;padding:6px"><canvas width="320" height="110" style="width:100%;border-radius:6px;background:linear-gradient(135deg,#1b1f3a,#3a1b3a);display:block;margin-bottom:4px"></canvas><b>'+k[1]+'</b><div style="font-size:11px;opacity:.7">'+k[2]+'</div></button>').join('')+'</div>';
+      B.appendChild(d);
+      const cvs=[...d.querySelectorAll('canvas')];
+      d.querySelectorAll('[data-kx]').forEach(b=>b.onclick=()=>addKx(KX[+b.dataset.kx][0]));
+      const t0=performance.now();
+      const loop=()=>{if(!d.isConnected)return;const T=((performance.now()-t0)/1000)%3.4;
+        cvs.forEach((c,i)=>{const x=c.getContext('2d');x.clearRect(0,0,320,110);drawKinetic(x,320,110,{text:i%2?'KINETIC TEXT':SAMPLE,size:20,x:.5,y:.5,color:'#fff',weight:900,anim:KX[i][0],bgOn:false},T,3.4)});
+        requestAnimationFrame(loop)};loop();
+    }catch(e){console.error('kx',e)}
+    return r;
+  };
+})();
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
 (function(){
   const o=renderPanel;
