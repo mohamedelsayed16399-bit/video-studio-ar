@@ -1265,3 +1265,17 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
       dirty=true;commit()}));
   };
 })();
+
+/* ===== R45: bulk subtitle tools (shift time, auto-gap fix, clear) ===== */
+(function(){
+  const orig=renderPanel;
+  renderPanel=function(){orig.apply(this,arguments);
+    if(S.tab!=='subs'||!S.subs.length)return;const B=document.getElementById('panel');if(!B||B.querySelector('#sbBox'))return;
+    const d=document.createElement('div');d.id='sbBox';d.style.cssText='padding:4px 12px 14px';
+    d.innerHTML='<div class="h4">🛠 أدوات الترجمة الجماعية</div><div class="fld"><label>إزاحة كل الترجمة (ثانية، سالب = أبكر)</label><input type="number" id="sbShift" step="0.1" value="0.5"></div><div style="display:flex;flex-wrap:wrap;gap:6px"><button class="btn" id="sbGo">⏱ طبّق الإزاحة</button><button class="btn" id="sbGap">🧹 سد الفراغات الصغيرة</button><button class="btn" id="sbTrim">✂ تنضيف المسافات</button></div>';
+    B.appendChild(d);
+    d.querySelector('#sbGo').onclick=()=>{const v=+d.querySelector('#sbShift').value||0;S.subs.forEach(s=>{const dur=s.e-s.s;s.s=Math.max(0,s.s+v);s.e=s.s+dur});S.subs.sort((a,b)=>a.s-b.s);dirty=true;commit();refreshAll();toast('اتزاحت الترجمة '+v+' ثانية ✅')};
+    d.querySelector('#sbGap').onclick=()=>{let n=0;S.subs.sort((a,b)=>a.s-b.s);for(let i=0;i<S.subs.length-1;i++){const g=S.subs[i+1].s-S.subs[i].e;if(g>0&&g<.6){S.subs[i].e=S.subs[i+1].s;n++}}dirty=true;commit();refreshAll();toast('اتسدّ '+n+' فراغ ✅')};
+    d.querySelector('#sbTrim').onclick=()=>{S.subs.forEach(s=>{s.t=String(s.t).replace(/[ \t]+/g,' ').replace(/\n{2,}/g,'\n').trim()});dirty=true;commit();refreshAll();toast('اتنضفت الترجمة ✅')};
+  };
+})();
