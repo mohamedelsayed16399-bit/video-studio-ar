@@ -187,6 +187,29 @@ function drawKeyed(ctx,c,a,w,h,t){
   const lt=clamp(t-c._s,0,cdur(c)),dd=cdur(c);let fa=1;if(c.fade>0)fa=Math.min(1,lt/c.fade,(dd-lt)/c.fade);
   ctx.globalAlpha=fa;ctx.drawImage(keyC,0,0);ctx.globalAlpha=1;
 }
+
+/* ===== R46: canvas filter fallback for browsers without ctx.filter (iOS Safari) ===== */
+let _nof=null;function NOFILT(){if(window.__forceNoFilter)return true;if(_nof===null){try{const x=document.createElement('canvas').getContext('2d');_nof=!('filter' in x)}catch(e){_nof=false}}return _nof}
+let _tl=null;function tmpLayer(w,h){if(!_tl)_tl=document.createElement('canvas');if(_tl.width!==w||_tl.height!==h){_tl.width=w;_tl.height=h}const x=_tl.getContext('2d');x.setTransform(1,0,0,1,0,0);x.globalAlpha=1;x.globalCompositeOperation='source-over';x.clearRect(0,0,w,h);return x}
+let _bl=null;
+function pixFilter(ctx,f,w,h){
+  const ops=[];f.replace(/([a-z-]+)\(([-\d.]+)(%|px|deg)?\)/g,(m,n,v,u)=>{ops.push([n,+v,u])});
+  const bl=ops.find(o=>o[0]==='blur');
+  if(bl&&bl[1]>0){const sc=Math.max(.05,1/(1+bl[1]*.6));if(!_bl)_bl=document.createElement('canvas');const bw=Math.max(8,Math.round(w*sc)),bh=Math.max(8,Math.round(h*sc));_bl.width=bw;_bl.height=bh;const bx=_bl.getContext('2d');bx.imageSmoothingQuality='high';bx.clearRect(0,0,bw,bh);bx.drawImage(ctx.canvas,0,0,bw,bh);ctx.clearRect(0,0,w,h);ctx.imageSmoothingQuality='high';ctx.drawImage(_bl,0,0,w,h)}
+  const px=ops.filter(o=>o[0]!=='blur');if(!px.length)return;
+  const im=ctx.getImageData(0,0,w,h),d=im.data;
+  for(let i=0;i<d.length;i+=4){if(!d[i+3])continue;let r=d[i]/255,g=d[i+1]/255,b=d[i+2]/255;
+    for(const [n,v,u] of px){const p=u==='%'?v/100:v;
+      if(n==='brightness'){r*=p;g*=p;b*=p}
+      else if(n==='contrast'){r=(r-.5)*p+.5;g=(g-.5)*p+.5;b=(b-.5)*p+.5}
+      else if(n==='saturate'){const l=.2126*r+.7152*g+.0722*b;r=l+(r-l)*p;g=l+(g-l)*p;b=l+(b-l)*p}
+      else if(n==='grayscale'){const l=.2126*r+.7152*g+.0722*b,q=Math.min(1,p);r+=(l-r)*q;g+=(l-g)*q;b+=(l-b)*q}
+      else if(n==='sepia'){const q=Math.min(1,p),R=.393*r+.769*g+.189*b,G=.349*r+.686*g+.168*b,B=.272*r+.534*g+.131*b;r+=(R-r)*q;g+=(G-g)*q;b+=(B-b)*q}
+      else if(n==='invert'){const q=Math.min(1,p);r+=((1-r)-r)*q;g+=((1-g)-g)*q;b+=((1-b)-b)*q}
+      else if(n==='hue-rotate'){const a=v*Math.PI/180,co=Math.cos(a),si=Math.sin(a);const R=r*(.213+co*.787-si*.213)+g*(.715-co*.715-si*.715)+b*(.072-co*.072+si*.928),G=r*(.213-co*.213+si*.143)+g*(.715+co*.285+si*.140)+b*(.072-co*.072-si*.283),B=r*(.213-co*.213-si*.787)+g*(.715-co*.715+si*.715)+b*(.072+co*.928+si*.072);r=R;g=G;b=B}
+      r=r<0?0:r>1?1:r;g=g<0?0:g>1?1:g;b=b<0?0:b>1?1:b}
+    d[i]=r*255;d[i+1]=g*255;d[i+2]=b*255}
+  ctx.putImageData(im,0,0)}
 function drawClipLayer(ctx,c,a,w,h,t){
   if(c.key&&a.type!=='audio'&&!drawClipLayer.raw){drawKeyed(ctx,c,a,w,h,t);return}
   const isImg=a.type==='image',src=isImg?a.img:a.el;
@@ -204,13 +227,15 @@ function drawClipLayer(ctx,c,a,w,h,t){
     ctx.globalAlpha=fa;ctx.imageSmoothingQuality='high';ctx.filter='brightness(55%)';ctx.drawImage(bgc,0,0,w,h);ctx.filter='none';ctx.globalAlpha=1;
   }
   let z=(c.zoom||100)/100;if(c.kb)z*=1+(c.kb/100)*(lt/d);if(c.pz){const pi=c.pi||3,sg=Math.floor(lt/pi),ph=lt-sg*pi,tgt=sg%2,e=easeOut(Math.min(1,ph/.18));z*=1+c.pz/100*(sg===0?(tgt?e:0):(tgt?e:1-e))}let shx=0,shy=0;if(c.fx==='pulse'){const ph=(lt*2)%1;z*=1+.06*((c.fxs==null?60:c.fxs)/60)*Math.exp(-ph*5)}else if(c.fx==='shake'){const fr=Math.floor(lt*30),m=(c.fxs==null?60:c.fxs)/100;shx=(rnd(fr,1)-.5)*w*.025*m;shy=(rnd(fr,2)-.5)*h*.025*m;z*=1+.03*m}sc*=z;
-  ctx.save();ctx.globalAlpha=fa;ctx.filter=filterStr(c,w);
+  const _f=filterStr(c,w);let _real=null;if(NOFILT()&&_f!=='none'){_real=ctx;ctx=tmpLayer(w,h)}
+  ctx.save();ctx.globalAlpha=fa;ctx.filter=_real?'none':_f;
   if(c.mask&&c.mask!=='none'){const m=Math.min(w,h)*(c.msz==null?80:c.msz)/100,mx=w/2+(c.mx||0)/100*w,my=h/2+(c.my||0)/100*h;ctx.beginPath();
     if(c.mask==='circle')ctx.arc(mx,my,m/2,0,7);else if(c.mask==='square')rrect(ctx,mx-m/2,my-m/2,m,m,m*.12);else if(c.mask==='wide')rrect(ctx,mx-m*.8,my-m*.45,m*1.6,m*.9,m*.1);else if(c.mask==='diamond'){ctx.moveTo(mx,my-m/2);ctx.lineTo(mx+m/2,my);ctx.lineTo(mx,my+m/2);ctx.lineTo(mx-m/2,my);ctx.closePath()}
     else if(c.mask==='heart'){const r=m/2;ctx.moveTo(mx,my+r*.9);ctx.bezierCurveTo(mx-r*1.5,my+r*.1,mx-r*.9,my-r*.9,mx,my-r*.35);ctx.bezierCurveTo(mx+r*.9,my-r*.9,mx+r*1.5,my+r*.1,mx,my+r*.9)}
     ctx.clip()}
   ctx.translate(w/2+(c.px||0)/100*w+shx,h/2+(c.py||0)/100*h+shy);ctx.rotate(rot);ctx.scale(fl,1);
   ctx.drawImage(src,csx,csy,csw,csh,-csw*sc/2,-csh*sc/2,csw*sc,csh*sc);ctx.restore();ctx.filter='none';
+  if(_real){pixFilter(ctx,_f,w,h,fa);_real.drawImage(ctx.canvas,0,0);ctx=_real}
   {const pp=PRESETS[c.preset];if(pp&&pp.tc){ctx.save();ctx.globalCompositeOperation='soft-light';ctx.globalAlpha=pp.ta||.3;ctx.fillStyle=pp.tc;ctx.fillRect(0,0,w,h);ctx.restore()}}
   if(c.temp||c.tint){ctx.save();ctx.globalCompositeOperation='soft-light';if(c.temp){ctx.globalAlpha=Math.min(1,Math.abs(c.temp)/100*.9);ctx.fillStyle=c.temp>0?'#ff9a1f':'#1f8bff';ctx.fillRect(0,0,w,h)}if(c.tint){ctx.globalAlpha=Math.min(1,Math.abs(c.tint)/100*.8);ctx.fillStyle=c.tint>0?'#ff2fb4':'#22e07a';ctx.fillRect(0,0,w,h)}ctx.restore()}
   postFx(ctx,c,w,h,lt);
