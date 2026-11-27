@@ -656,7 +656,10 @@ const CDN='https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
 let asr=null,asrKey='';
 async function loadASR(model,cb){
   if(asr&&asrKey===model)return asr;
-  const T=await import(CDN);T.env.allowLocalModels=false;T.env.useBrowserCache=true;
+  let T=null,lastErr=null;
+  for(const u of [CDN,'https://esm.sh/@xenova/transformers@2.17.2','https://unpkg.com/@xenova/transformers@2.17.2/dist/transformers.min.js']){try{T=await import(u);if(T&&T.pipeline)break}catch(e){lastErr=e;T=null}}
+  if(!T)throw lastErr||new Error('تعذر تحميل مكتبة التفريغ');
+  T.env.allowLocalModels=false;T.env.useBrowserCache=true;
   asr=await T.pipeline('automatic-speech-recognition',model,{progress_callback:cb});asrKey=model;return asr;
 }
 async function clipPCM(c){
@@ -664,6 +667,12 @@ async function clipPCM(c){
   if(!a.pcm){const ac=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});const buf=await ac.decodeAudioData(await a.file.arrayBuffer());const n=buf.length,m=new Float32Array(n);
     for(let ch=0;ch<buf.numberOfChannels;ch++){const d=buf.getChannelData(ch);for(let i=0;i<n;i++)m[i]+=d[i]/buf.numberOfChannels}a.pcm=m;ac.close()}
   return a.pcm.subarray(Math.floor(c.in*16000),Math.min(a.pcm.length,Math.ceil(c.out*16000)));
+}
+/* skip captions Whisper invents over silence: RMS of the chunk's time range (in source seconds) */
+function chunkSilent(pcm,t0,t1){
+  const a=Math.max(0,Math.floor(t0*16000)),b=Math.min(pcm.length,Math.ceil(t1*16000));if(b-a<800)return false;
+  let e=0;const step=4;let n=0;for(let i=a;i<b;i+=step){e+=pcm[i]*pcm[i];n++}
+  return 10*Math.log10(e/Math.max(1,n)+1e-12)<-52;
 }
 function splitLong(s,max=42){
   if(s.t.length<=max)return[s];const words=s.t.split(/\s+/),parts=[];let cur='';words.forEach(w=>{if((cur+' '+w).trim().length>max&&cur){parts.push(cur);cur=w}else cur=(cur+' '+w).trim()});if(cur)parts.push(cur);
@@ -686,6 +695,7 @@ async function runASR(){
       const opt={task:'transcribe',chunk_length_s:30,stride_length_s:5,return_timestamps:true};if(lang)opt.language=lang;
       const out=await asr(pcm,opt);
       const d=cdur(c);(out.chunks||[]).forEach(ch=>{const t0=(ch.timestamp[0]||0)/c.speed,t1=ch.timestamp[1]==null?d:ch.timestamp[1]/c.speed;const tx=(ch.text||'').trim();if(!tx||/^[.\s…]+$/.test(tx))return;
+        if(chunkSilent(pcm,ch.timestamp[0]||0,ch.timestamp[1]==null?(pcm.length/16000):ch.timestamp[1]))return;
         splitLong({id:uid(),s:c._s+t0,e:c._s+Math.min(d,Math.max(t1,t0+.4)),t:tx}).forEach(x=>all.push(x))});
     }
     const lo=Math.min(...vids.map(c=>c._s)),hi=Math.max(...vids.map(c=>c._s+cdur(c)));
