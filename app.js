@@ -1108,3 +1108,28 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
     d.querySelectorAll('[data-dk]').forEach(el=>{const k=el.dataset.dk;el.addEventListener('input',()=>{P[k]=el.type==='checkbox'?el.checked:el.value;dirty=true;commit()})});
   };
 })();
+
+/* ===== R32: auto slideshow maker ===== */
+(function(){
+  const TR=['fade','slide','zoom','circle','wipe','push','blinds','spin'];
+  function make(dur,style){
+    const imgs=Object.values(assets).filter(a=>a.type==='image');
+    if(!imgs.length){toast('ضيف صور الأول من "اختار ملفات"');return}
+    const fast=style==='fast';let i=0;if(S.clips.length&&S.clips.every(c=>assets[c.aid]&&assets[c.aid].type==='image'))S.clips=[];
+    imgs.forEach(a=>{
+      const c=defClip(a.id);c.out=dur;c.fit='cover';c.kb=fast?6:12+Math.round(Math.random()*10);
+      c.px=0;c.py=0;
+      if(S.clips.length||i>0){c.trans=fast?TR[(i*3)%TR.length]:(i%2?'fade':'zoom');c.transD=fast?.35:.8}
+      if(style==='cine'){c.preset=['teal','golden','moody','drama'][i%4];c.vig=true}
+      S.clips.push(c);i++});
+    layout();commit();refreshAll();dirty=true;seekTo(0);toast('اتعمل سلايد شو من '+imgs.length+' صورة ✅ (دوس تشغيل)')}
+  const orig=renderPanel;
+  renderPanel=function(){orig.apply(this,arguments);
+    if(S.tab!=='media')return;const B=document.getElementById('panel');if(!B||B.querySelector('#ssBox'))return;
+    const n=Object.values(assets).filter(a=>a.type==='image').length;if(n<2)return;
+    const d=document.createElement('div');d.id='ssBox';d.style.cssText='padding:4px 12px 14px';
+    d.innerHTML='<div class="h4">🖼 سلايد شو تلقائي ('+n+' صور)</div><div class="fld"><label>مدة كل صورة (ث)</label><input type="number" id="ssDur" min="1" max="10" step="0.5" value="3"></div><div class="presets" style="grid-template-columns:repeat(3,1fr)"><button data-ss="soft">هادي</button><button data-ss="fast">سريع</button><button data-ss="cine">سينمائي</button></div>';
+    B.appendChild(d);d.querySelectorAll('[data-ss]').forEach(b=>b.onclick=()=>make(Math.max(1,Math.min(10,+d.querySelector('#ssDur').value||3)),b.dataset.ss));
+  };
+  window.__slideshow=make;
+})();
