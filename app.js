@@ -1209,3 +1209,23 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
     d.querySelectorAll('[data-em]').forEach(b=>b.onclick=()=>{const x=addText(b.dataset.em);x.size=18;x.x=.2+Math.random()*.6;x.y=.25+Math.random()*.5;x.anim='pop';x.end=x.start+2.5;commit();refreshAll()});
   };
 })();
+
+/* ===== R41: fade from/to black for the whole project ===== */
+(function(){
+  const o=drawFrame;
+  drawFrame=function(ctx,w,h,t,opt){o.apply(this,arguments);
+    const F=S.subStyle&&S.subStyle.fio;if(!F||!(total>0))return;let a=0;
+    if(F.i>0&&t<F.i)a=Math.max(a,1-t/F.i);
+    if(F.o>0&&t>total-F.o)a=Math.max(a,1-(total-t)/F.o);
+    if(a>0){ctx.save();ctx.globalAlpha=Math.min(1,a);ctx.fillStyle=F.c==='w'?'#fff':'#000';ctx.fillRect(0,0,w,h);ctx.restore()}
+  };
+  const orig=renderPanel;
+  renderPanel=function(){orig.apply(this,arguments);
+    if(S.tab!=='export')return;const B=document.getElementById('panel');if(!B||B.querySelector('#fioBox'))return;
+    const F=S.subStyle.fio||(S.subStyle.fio={i:0,o:0,c:'b'});
+    const d=document.createElement('div');d.id='fioBox';d.style.cssText='padding:4px 12px 14px';
+    d.innerHTML='<div class="h4">🌑 فيد بداية ونهاية الفيديو</div><div class="fld"><label>فيد في البداية (ث)</label><input type="number" data-fio="i" min="0" max="5" step="0.1" value="'+F.i+'"></div><div class="fld"><label>فيد في النهاية (ث)</label><input type="number" data-fio="o" min="0" max="5" step="0.1" value="'+F.o+'"></div><div class="fld"><label>اللون</label><select data-fio="c"><option value="b"'+(F.c==='b'?' selected':'')+'>أسود</option><option value="w"'+(F.c==='w'?' selected':'')+'>أبيض</option></select></div>';
+    B.appendChild(d);
+    d.querySelectorAll('[data-fio]').forEach(el=>el.addEventListener('input',()=>{const k=el.dataset.fio;F[k]=k==='c'?el.value:Math.max(0,Math.min(5,+el.value||0));dirty=true;commit()}));
+  };
+})();
