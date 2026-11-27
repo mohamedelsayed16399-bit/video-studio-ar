@@ -1143,3 +1143,23 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   };
   window.__slideshow=make;
 })();
+
+/* ===== R36: caption style presets ===== */
+(function(){
+  const CP=[
+    {n:'🎬 سينمائي',s:{size:4.6,color:'#ffffff',bg:false,pos:90,kar:false}},
+    {n:'🔥 تيك توك',s:{size:7,color:'#ffffff',bg:false,pos:70,kar:true,khc:'#ffe14d'}},
+    {n:'🟨 أصفر كلاسيك',s:{size:5.6,color:'#ffe14d',bg:true,pos:88,kar:false}},
+    {n:'⬛ صندوق',s:{size:5.4,color:'#ffffff',bg:true,pos:86,kar:false}},
+    {n:'💚 نيون',s:{size:6,color:'#39ff88',bg:false,pos:80,kar:true,khc:'#ff3df2'}},
+    {n:'📰 أخبار',s:{size:4.8,color:'#ffffff',bg:true,pos:93,kar:false}}
+  ];
+  const orig=renderPanel;
+  renderPanel=function(){orig.apply(this,arguments);
+    if(S.tab!=='subs')return;const B=document.getElementById('panel');if(!B||B.querySelector('#cpBox'))return;
+    const d=document.createElement('div');d.id='cpBox';d.style.cssText='padding:4px 12px 14px';
+    d.innerHTML='<div class="h4">✨ ستايلات جاهزة للترجمة</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+CP.map((c,i)=>'<button class="btn" data-cp="'+i+'">'+c.n+'</button>').join('')+'</div>';
+    B.appendChild(d);
+    d.querySelectorAll('[data-cp]').forEach(b=>b.onclick=()=>{Object.assign(S.subStyle,CP[+b.dataset.cp].s);dirty=true;commit();refreshAll();toast('اتطبق ستايل الترجمة ✅')});
+  };
+})();
