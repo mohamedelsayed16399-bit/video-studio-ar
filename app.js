@@ -1163,3 +1163,16 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
     d.querySelectorAll('[data-cp]').forEach(b=>b.onclick=()=>{Object.assign(S.subStyle,CP[+b.dataset.cp].s);dirty=true;commit();refreshAll();toast('اتطبق ستايل الترجمة ✅')});
   };
 })();
+
+/* ===== R37: one-click reframe ===== */
+(function(){
+  const RF=[['16:9','🖥 16:9 يوتيوب'],['9:16','📱 9:16 ريلز'],['1:1','⬜ 1:1 مربع'],['4:5','📷 4:5 انستجرام']];
+  const orig=renderPanel;
+  renderPanel=function(){orig.apply(this,arguments);
+    if(S.tab!=='media'||!S.clips.length)return;const B=document.getElementById('panel');if(!B||B.querySelector('#rfBox'))return;
+    const d=document.createElement('div');d.id='rfBox';d.style.cssText='padding:4px 12px 14px';
+    d.innerHTML='<div class="h4">📐 إعادة تأطير بضغطة (يملا الكادر)</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+RF.map(r=>'<button class="btn" data-rf="'+r[0]+'">'+r[1]+'</button>').join('')+'</div>';
+    B.appendChild(d);
+    d.querySelectorAll('[data-rf]').forEach(b=>b.onclick=()=>{S.aspect=b.dataset.rf;setCanvasSize(quality);S.clips.forEach(c=>{c.fit='cover';c.px=0;c.py=0});dirty=true;commit();refreshAll();toast('اتعمل تأطير '+S.aspect+' ✅')});
+  };
+})();
