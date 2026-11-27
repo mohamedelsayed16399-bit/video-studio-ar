@@ -1601,13 +1601,14 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
       d.querySelectorAll('[data-tg]').forEach(b=>b.onclick=()=>{
         if(!S.clips.length){toast('ضيف مقاطع الأول');return}
         const t=TG[+b.dataset.tg];
+        commit();const oc=commit;commit=function(){};try{
         S.aspect=t.as;setCanvasSize(quality);
         S.clips.forEach((c,i)=>{c.preset=t.pr;c.vig=t.vig;c.kb=t.kb;c.trans=i?t.tr:'none';c.transD=t.td});
         const F=S.subStyle.fio||(S.subStyle.fio={i:0,o:0,c:'b'});F.i=t.fio[0];F.o=t.fio[1];F.c=t.fio[2];
         S.texts=S.texts.filter(x=>!x._tpl);
         layout();
         if(t.ti){const x=addText(t.ti);Object.assign(x,t.to,{start:.3,end:Math.min(3,total),_tpl:1})}
-        S.tab='media';commit();refreshAll();seekTo(0);toast('اتطبق قالب '+t.n+' ✅',3500);
+        S.tab='media';}finally{commit=oc}commit();refreshAll();seekTo(0);toast('اتطبق قالب '+t.n+' ✅',3500);
       });
     }catch(e){}
     return r;
