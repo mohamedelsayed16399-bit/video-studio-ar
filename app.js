@@ -1490,6 +1490,45 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   };
 })();
 
+/* ===== R55: auto highlight reel (loudest moments of a video clip) ===== */
+(function(){
+  const HR={len:15,win:2};
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='fx')return r;
+      const c=S.sel&&S.sel.k==='clip'?selObj():null;const a=c&&assets[c.aid];
+      if(!c||!a||a.type!=='video')return r;
+      const d=document.createElement('div');d.id='hrBox';d.style.cssText='padding:4px 12px 14px';
+      d.innerHTML='<div class="h4">⚡ ملخص تلقائي (Highlight Reel)</div><p class="hint">بيحلل صوت المقطع ويختار أعلى اللحظات حماس وبيجمعها بالترتيب في ملخص قصير.</p>'+
+        '<div class="fld"><label>مدة الملخص <b>'+HR.len+'ث</b></label><input type="range" id="hrLen" min="5" max="60" step="1" value="'+HR.len+'"></div>'+
+        '<div class="fld"><label>طول كل لقطة <b>'+HR.win+'ث</b></label><input type="range" id="hrWin" min="1" max="5" step="0.5" value="'+HR.win+'"></div>'+
+        '<button class="btn primary" id="hrGo">⚡ اعمل الملخص</button>';
+      B.appendChild(d);
+      d.querySelector('#hrLen').oninput=e=>{HR.len=+e.target.value;e.target.previousElementSibling.querySelector('b').textContent=HR.len+'ث'};
+      d.querySelector('#hrWin').oninput=e=>{HR.win=+e.target.value;e.target.previousElementSibling.querySelector('b').textContent=HR.win+'ث'};
+      d.querySelector('#hrGo').onclick=async()=>{
+        const btn=d.querySelector('#hrGo');btn.disabled=true;btn.textContent='بحلل...';
+        try{
+          const pcm=await clipPCM(c);if(!pcm||!pcm.length)throw 0;
+          const dur=c.out-c.in,W=HR.win,n=Math.floor(dur/W);
+          if(dur<=HR.len+1){toast('المقطع قصير، زوّد طوله أو قلّل مدة الملخص');return}
+          const sc=[];for(let i=0;i<n;i++){const s=Math.floor(i*W*16000),e=Math.min(pcm.length,Math.floor((i+1)*W*16000));let sum=0;for(let j=s;j<e;j++)sum+=pcm[j]*pcm[j];sc.push({i,v:sum/Math.max(1,e-s)})}
+          const k=Math.max(1,Math.min(n,Math.round(HR.len/W)));
+          const top=sc.slice().sort((x,y)=>y.v-x.v).slice(0,k).sort((x,y)=>x.i-y.i);
+          const idx=S.clips.indexOf(c);
+          const nc=top.map((t,q)=>Object.assign({},c,{id:q?uid():c.id,in:c.in+t.i*W,out:Math.min(c.out,c.in+(t.i+1)*W),trans:q?'fade':c.trans,transD:.25}));
+          S.clips.splice(idx,1,...nc);S.sel={k:'clip',id:nc[0].id};layout();commit();refreshAll();seekTo(nc[0]._s);dirty=true;
+          toast('اتعمل ملخص '+nc.length+' لقطة، '+(nc.length*W).toFixed(0)+' ثانية ✅',4500);
+        }catch(e){toast('معرفتش أحلل صوت المقطع ده')}
+        finally{btn.disabled=false;btn.textContent='⚡ اعمل الملخص'}
+      };
+    }catch(e){}
+    return r;
+  };
+})();
+
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
 (function(){
   const o=renderPanel;
