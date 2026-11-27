@@ -1088,3 +1088,23 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
     d.querySelectorAll('[data-pl]').forEach(b=>b.onclick=()=>{const p=PL[+b.dataset.pl];S.aspect=p[1];exp.short=p[2];exp.fps=p[3];if(p[4])S.clips.forEach(c=>{c.fit='cover'});else S.clips.forEach(c=>{c.fit='contain'});setCanvasSize(quality);commit();refreshAll();toast('اتظبط: '+p[0].replace(/^\S+\s/,''));renderPanel()});
   };
 })();
+
+/* ===== R31: progress bar + watermark overlays ===== */
+(function(){
+  const o=drawFrame;
+  drawFrame=function(ctx,w,h,t,opt){o.apply(this,arguments);
+    const P=S.subStyle&&S.subStyle.deco;if(!P)return;
+    if(P.bar&&total>0){const th=Math.max(2,Math.round(h*(P.bth||1.2)/100)),y=P.bpos==='top'?0:h-th;ctx.save();ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(0,y,w,th);ctx.fillStyle=P.bcol||'#7c5cff';ctx.fillRect(0,y,w*Math.min(1,t/total),th);ctx.restore()}
+    if(P.wm&&P.wmt){const fs=Math.round(h*.035);ctx.save();ctx.font='700 '+fs+'px Cairo, sans-serif';ctx.globalAlpha=(P.wmo||60)/100;ctx.fillStyle='#fff';ctx.shadowColor='rgba(0,0,0,.6)';ctx.shadowBlur=fs*.3;ctx.textBaseline='middle';ctx.direction=/[\u0600-\u06FF]/.test(P.wmt)?'rtl':'ltr';const m=h*.03,tw=ctx.measureText(P.wmt).width;const pos=P.wmp||'br';ctx.textAlign='left';const x=pos.includes('l')?m:w-m-tw,y=pos.includes('t')?m+fs/2+(P.bar&&P.bpos==='top'?h*.015:0):h-m-fs/2-(P.bar&&P.bpos!=='top'?h*.015:0);ctx.fillText(P.wmt,x,y);ctx.restore()}
+  };
+  const orig=renderPanel;
+  renderPanel=function(){orig.apply(this,arguments);
+    if(S.tab!=='export')return;const B=document.getElementById('panel');if(!B||B.querySelector('#decoBox'))return;
+    const P=S.subStyle.deco||(S.subStyle.deco={bar:false,bcol:'#7c5cff',bpos:'bottom',bth:1.2,wm:false,wmt:'',wmp:'br',wmo:60});
+    const d=document.createElement('div');d.id='decoBox';d.style.cssText='padding:4px 12px 14px';
+    const sel=(k,opts)=>'<select data-dk="'+k+'">'+opts.map(([v,n])=>'<option value="'+v+'"'+(P[k]===v?' selected':'')+'>'+n+'</option>').join('')+'</select>';
+    d.innerHTML='<div class="h4">🎚 شريط تقدم وعلامة مائية</div><label class="chk"><input type="checkbox" data-dk="bar" '+(P.bar?'checked':'')+'> شريط تقدم الفيديو</label><div class="r2"><div class="fld"><label>مكانه</label>'+sel('bpos',[['bottom','تحت'],['top','فوق']])+'</div><div class="fld"><label>لونه</label><input type="color" data-dk="bcol" value="'+P.bcol+'"></div></div><label class="chk"><input type="checkbox" data-dk="wm" '+(P.wm?'checked':'')+'> علامة مائية (نص)</label><div class="fld"><label>النص (اسمك أو قناتك)</label><input type="text" data-dk="wmt" value="'+(P.wmt||'').replace(/"/g,'&quot;')+'" placeholder="@اسمك"></div><div class="fld"><label>مكانها</label>'+sel('wmp',[['br','تحت يمين'],['bl','تحت شمال'],['tr','فوق يمين'],['tl','فوق شمال']])+'</div>';
+    const last=B.lastElementChild;B.appendChild(d);
+    d.querySelectorAll('[data-dk]').forEach(el=>{const k=el.dataset.dk;el.addEventListener('input',()=>{P[k]=el.type==='checkbox'?el.checked:el.value;dirty=true;commit()})});
+  };
+})();
