@@ -1196,3 +1196,16 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
     d.querySelectorAll('[data-tt]').forEach(b=>b.onclick=()=>{const r=TT[+b.dataset.tt],x=addText(r.t);Object.assign(x,r.o);commit();refreshAll();toast('اتضاف القالب ✅')});
   };
 })();
+
+/* ===== R40: emoji stickers ===== */
+(function(){
+  const EM=['😂','🔥','❤️','👍','😍','😎','🎉','💯','⭐','👀','😱','🙏','💪','🚀','✅','❌','👑','🎵','💥','🤩'];
+  const orig=renderPanel;
+  renderPanel=function(){orig.apply(this,arguments);
+    if(S.tab!=='text')return;const B=document.getElementById('panel');if(!B||B.querySelector('#emBox'))return;
+    const d=document.createElement('div');d.id='emBox';d.style.cssText='padding:4px 12px 14px';
+    d.innerHTML='<div class="h4">😀 ملصقات إيموجي</div><div style="display:flex;flex-wrap:wrap;gap:4px">'+EM.map(e=>'<button class="btn" data-em="'+e+'" style="font-size:20px;padding:4px 8px">'+e+'</button>').join('')+'</div>';
+    B.appendChild(d);
+    d.querySelectorAll('[data-em]').forEach(b=>b.onclick=()=>{const x=addText(b.dataset.em);x.size=18;x.x=.2+Math.random()*.6;x.y=.25+Math.random()*.5;x.anim='pop';x.end=x.start+2.5;commit();refreshAll()});
+  };
+})();
