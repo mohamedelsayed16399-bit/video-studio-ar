@@ -108,7 +108,7 @@ function drawCaption(ctx,w,h,text,cx0,cy0,sizePct,color,bgColor,o={}){
   let cy=cy0;if(o.clamp)cy=Math.min(cy,h-bh/2-fs*.45);
   ctx.globalAlpha*=o.alpha==null?1:o.alpha;ctx.translate(cx0,cy+(o.dy||0));if(o.sc&&o.sc!==1)ctx.scale(o.sc,o.sc);
   if(bgColor){ctx.fillStyle=bgColor;rrect(ctx,-bw/2-fs*.45,-bh/2-fs*.12,bw+fs*.9,bh+fs*.24,fs*.32);ctx.fill()}
-  ctx.lineJoin='round';ctx.lineWidth=fs*.14;ctx.strokeStyle='rgba(0,0,0,.9)';ctx.fillStyle=color;
+  ctx.lineJoin='round';ctx.lineWidth=fs*.14*(o.stw==null?1:o.stw);ctx.strokeStyle=o.stc||'rgba(0,0,0,.9)';ctx.fillStyle=color;if(o.glow){ctx.shadowColor=o.glow;ctx.shadowBlur=fs*.5}
   if(o.kar){
     const rtl=ctx.direction==='rtl',allW=lines.join(' ').replace(/\s+/g,'').length||1;let acc=0;const cur=o.kar.p*allW;
     ctx.textAlign=rtl?'right':'left';const sp=ctx.measureText(' ').width;
@@ -266,7 +266,7 @@ function drawFrame(ctx,w,h,t,opt={}){
     else if(tx.anim==='drop'){const k=Math.min(1,lt/.55);dy=-(1-k)*(1-k)*h*.4;alpha=Math.min(1,lt/.1,(d-lt)/.25);if(k>.85&&k<1)sc=1+.08*Math.sin((k-.85)/.15*Math.PI)}
     else if(tx.anim==='type'){txt=[...tx.text].slice(0,Math.ceil([...tx.text].length*Math.min(1,lt/(d*.55)))).join('')}
     if(!txt)return;
-    drawCaption(ctx,w,h,txt,tx.x*w+xo,tx.y*h,tx.size,tx.color,tx.bgOn?tx.bg:null,{alpha,sc,dy,weight:tx.weight});
+    drawCaption(ctx,w,h,txt,tx.x*w+xo,tx.y*h,tx.size,tx.color,tx.bgOn?tx.bg:null,{alpha,sc,dy,weight:tx.weight,stc:tx.stc,stw:tx.stw,glow:tx.glow});
   });
   if(opt.subs!==false&&S.subStyle.burn){
     const sub=S.subs.find(s=>t>=s.s&&t<=s.e);
@@ -1231,5 +1231,21 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
     d.innerHTML='<div class="h4">🌑 فيد بداية ونهاية الفيديو</div><div class="fld"><label>فيد في البداية (ث)</label><input type="number" data-fio="i" min="0" max="5" step="0.1" value="'+F.i+'"></div><div class="fld"><label>فيد في النهاية (ث)</label><input type="number" data-fio="o" min="0" max="5" step="0.1" value="'+F.o+'"></div><div class="fld"><label>اللون</label><select data-fio="c"><option value="b"'+(F.c==='b'?' selected':'')+'>أسود</option><option value="w"'+(F.c==='w'?' selected':'')+'>أبيض</option></select></div>';
     B.appendChild(d);
     d.querySelectorAll('[data-fio]').forEach(el=>el.addEventListener('input',()=>{const k=el.dataset.fio;F[k]=k==='c'?el.value:Math.max(0,Math.min(5,+el.value||0));dirty=true;commit()}));
+  };
+})();
+
+/* ===== R43: text outline color/width + glow ===== */
+(function(){
+  const orig=renderPanel;
+  renderPanel=function(){orig.apply(this,arguments);
+    if(S.tab!=='text')return;const B=document.getElementById('panel');if(!B)return;
+    const tx=S.sel&&S.sel.k==='text'&&S.texts.find(t=>t.id===S.sel.id);if(!tx||B.querySelector('#tsBox'))return;
+    const d=document.createElement('div');d.id='tsBox';d.style.cssText='padding:4px 12px 14px';
+    d.innerHTML='<div class="h4">🖍 حدود وتوهج النص</div><div class="fld"><label>لون الحد</label><input type="color" data-ts="stc" value="'+(tx.stc||'#000000')+'"></div><div class="fld"><label>سمك الحد</label><input type="range" data-ts="stw" min="0" max="3" step="0.1" value="'+(tx.stw==null?1:tx.stw)+'"></div><div class="fld"><label>لون التوهج</label><input type="color" data-ts="glow" value="'+(tx.glow||'#ffffff')+'"> <label class="chk"><input type="checkbox" data-ts="gon" '+(tx.glow?'checked':'')+'> تشغيل التوهج</label></div>';
+    B.appendChild(d);
+    d.querySelectorAll('[data-ts]').forEach(el=>el.addEventListener('input',()=>{const k=el.dataset.ts;
+      if(k==='stw')tx.stw=+el.value;else if(k==='stc')tx.stc=el.value;
+      else{const gc=d.querySelector('[data-ts="glow"]').value,on=d.querySelector('[data-ts="gon"]').checked;tx.glow=on?gc:null}
+      dirty=true;commit()}));
   };
 })();
