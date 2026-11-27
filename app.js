@@ -1858,6 +1858,7 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
 /* ===== R71: project cleanup (cut silences in ALL clips + match loudness), analyze first then apply ===== */
 (function(){
   const CL={norm:true,res:null,busy:false};
+  window.__cl={analyze:(...x)=>analyze(...x),apply:(...x)=>apply(...x)};
   const fmt=t=>{t=Math.max(0,Math.round(t));return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')};
   async function analyze(){
     const out=[];
@@ -2062,6 +2063,65 @@ function ovMotion(ov,lt,d){
       const n=d.querySelector('#teNone');if(n)n.onclick=()=>{TE.sel.clear();renderPanel()};
       const g=d.querySelector('#teGo');if(g)g.onclick=()=>{doCut()};
     }catch(e){console.error('te',e)}
+    return r;
+  };
+})();
+/* ===== R76: one-click Shorts maker (cut silence, keep the loudest moments to a target length, 9:16, vivid look, flash transitions, big karaoke captions) ===== */
+(function(){
+  const SM={len:30,sil:true,busy:false};
+  async function make(){
+    if(!S.clips.length){toast('ضيف مقاطع الأول');return}
+    SM.busy=true;renderPanel();
+    const oc=commit;commit=function(){};let before=0,after=0,note='';
+    try{
+      layout();before=total;
+      if(SM.sil&&window.__cl){const res=await window.__cl.analyze();window.__cl.apply(res,true)}
+      layout();
+      if(total>SM.len+.5){
+        const W=2,wins=[];
+        for(let ci=0;ci<S.clips.length;ci++){const c=S.clips[ci],a=assets[c.aid];
+          if(!a||a.type!=='video'||c.ramp)continue;let pcm=null;try{pcm=await clipPCM(c)}catch(e){}if(!pcm||!pcm.length)continue;
+          const dur=c.out-c.in,n=Math.ceil(dur/W);
+          for(let i=0;i<n;i++){const s=Math.floor(i*W*16000),e=Math.min(pcm.length,Math.floor((i+1)*W*16000));if(e-s<8000&&i>0)continue;let sum=0;for(let j=s;j<e;j++)sum+=pcm[j]*pcm[j];
+            wins.push({ci,i,v:sum/Math.max(1,e-s),len:(Math.min(c.out,c.in+(i+1)*W)-(c.in+i*W))/(c.speed||1)})}}
+        const fixed=S.clips.filter(c=>{const a=assets[c.aid];return !a||a.type!=='video'||c.ramp}).reduce((n,c)=>n+cdur(c),0);
+        let acc=fixed;const pick=new Set();wins.slice().sort((x,y)=>y.v-x.v).forEach(w=>{if(acc<SM.len){pick.add(w.ci+':'+w.i);acc+=w.len}});
+        const nc=[];
+        S.clips.forEach((c,ci)=>{
+          const a=assets[c.aid];if(!a||a.type!=='video'||c.ramp||!wins.some(w=>w.ci===ci)){nc.push(c);return}
+          const idx=[...pick].filter(k=>+k.split(':')[0]===ci).map(k=>+k.split(':')[1]).sort((x,y)=>x-y);
+          let seg=null;const segs=[];idx.forEach(i=>{if(seg&&seg[1]===i)seg[1]=i+1;else{seg=[i,i+1];segs.push(seg)}});
+          segs.forEach((g,q)=>nc.push(Object.assign({},c,{id:q?uid():c.id,in:c.in+g[0]*W,out:Math.min(c.out,c.in+g[1]*W),trans:'none'})));
+        });
+        if(nc.length)S.clips=nc;
+        note=' + أعلى اللحظات';
+      }
+      S.aspect='9:16';setCanvasSize(quality);
+      S.clips.forEach((c,i)=>{c.preset='vivid';c.kb=6;c.trans=i?'flashw':'none';c.transD=.3});
+      const F=S.subStyle.fio||(S.subStyle.fio={i:0,o:0,c:'b'});F.i=.1;F.o=.3;F.c='b';
+      Object.assign(S.subStyle,{burn:true,kar:true,size:7,pos:70});
+      layout();after=total;S.sel=null;
+    }catch(e){console.error('shorts',e);toast('حصلت مشكلة، جرّب تاني')}
+    finally{commit=oc;SM.busy=false}
+    commit();refreshAll();seekTo(0);dirty=true;
+    toast('اتعمل شورت '+Math.round(after)+'ث من '+Math.round(before)+'ث ✅'+note+' (Undo للتراجع)',5000);
+  }
+  window.__shorts=make;window.__SM=SM;
+  const o=renderPanel;
+  renderPanel=function(){
+    const r=o.apply(this,arguments);
+    try{
+      const B=document.getElementById('panel');if(!B||S.tab!=='media')return r;
+      const d=document.createElement('div');d.id='smBox';d.style.cssText='padding:4px 12px 14px';
+      d.innerHTML='<div class="h4">🚀 صانع الشورتس بضغطة</div><p class="hint">بيقص الصمت، يسيب أعلى اللحظات صوتاً لحد المدة اللي تختارها، ويحوّل 9:16 بألوان حيوية وانتقالات وترجمة كاراوكي كبيرة. تتراجع بـ Undo.</p>'+
+        '<div class="row" style="display:flex;gap:6px;margin-bottom:6px">'+[15,30,45,60].map(n=>'<button class="btn'+(SM.len===n?' primary':'')+'" data-sml="'+n+'" style="flex:1">'+n+'ث</button>').join('')+'</div>'+
+        '<label style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input type="checkbox" id="smSil" '+(SM.sil?'checked':'')+'> قص الصمت كمان</label>'+
+        '<button class="btn primary" id="smGo" style="width:100%"'+(SM.busy?' disabled':'')+'>'+(SM.busy?'بشتغل...':'🚀 اعمل شورت')+'</button>';
+      B.appendChild(d);
+      d.querySelectorAll('[data-sml]').forEach(b=>b.onclick=()=>{SM.len=+b.dataset.sml;renderPanel()});
+      d.querySelector('#smSil').onchange=e=>{SM.sil=e.target.checked};
+      d.querySelector('#smGo').onclick=make;
+    }catch(e){console.error('sm',e)}
     return r;
   };
 })();
