@@ -1792,6 +1792,49 @@ window.__ramp={srcTime,cdur,rampSpeedAt};
   };
 })();
 
+/* ===== R70: feature finder (search all tools, jump to them) ===== */
+(function(){
+  const IDX=[
+    {t:'قوالب جاهزة للمشروع كله',k:'قالب ستايل ريلز سينمائي تيك توك ألوان انتقالات',tab:'media',id:'tgBox'},
+    {t:'مشروع كامل بضغطة (مقدمة + ختام + موسيقى)',k:'مقدمة ختام موسيقى تلقائي كامل intro outro',tab:'media',id:'pbBox'},
+    {t:'قوالب نصوص جاهزة',k:'نص عنوان ثلث سفلي شريط أخبار اشترك lower third',tab:'text',id:'ttBox'},
+    {t:'ملصقات إيموجي',k:'إيموجي ستيكر ملصق emoji',tab:'text',id:'emBox'},
+    {t:'كي فريم للنص (تحريك)',k:'تحريك نص كي فريم keyframe حركة تكبير',tab:'text',id:'tkBox',need:'text'},
+    {t:'ترجمة من نص مكتوب',k:'سكربت نص ترجمة توقيت لصق script',tab:'subs',id:'scBox'},
+    {t:'ستايلات الترجمة',k:'ستايل ترجمة شكل خط لون كابشن caption',tab:'subs',id:'cpBox'},
+    {t:'أدوات الترجمة الجماعية',k:'ترجمة دمج تقسيم إزاحة وقت حذف bulk',tab:'subs',id:'ssoBox'},
+    {t:'كي فريم للمقطع (حركة وزووم)',k:'كي فريم keyframe حركة زووم دوران مقطع',tab:'fx',id:'kfBox',need:'clip'},
+    {t:'ملخص تلقائي (Highlight Reel)',k:'ملخص هايلايت أعلى لحظات اختصار reel',tab:'fx',id:'hrBox',need:'video'},
+    {t:'نسخ ولصق المظهر',k:'نسخ لصق مظهر فلتر تأثيرات clone',tab:'fx',id:'cpyBox',need:'clip'},
+    {t:'تلاشي صوت المقطع',k:'فيد صوت تلاشي دخول خروج fade audio',tab:'fx',id:'cafBox',need:'video'},
+    {t:'المازج (مستوى وكتم وسولو)',k:'مازج صوت مستوى كتم سولو mixer volume mute solo',tab:'audio',id:'mxBox'},
+    {t:'موسيقى جاهزة',k:'موسيقى مولّد جاهزة music generate',tab:'audio',id:'genBox'},
+    {t:'فيد بداية ونهاية الفيديو',k:'فيد أسود أبيض بداية نهاية fade',tab:'export',id:'fioBox'}
+  ];
+  const norm=s=>String(s).toLowerCase().replace(/[\u064B-\u0652\u0640]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي');
+  function jump(it){
+    if(it.need==='text'){if(!S.texts.length){toast('ضيف نص الأول وبعدين افتح الأداة دي');return false}S.sel={k:'text',id:S.texts[0].id}}
+    else if(it.need){const c=S.sel&&S.sel.k==='clip'&&selObj()?selObj():S.clips.find(c=>assets[c.aid]&&(it.need==='clip'||assets[c.aid].type==='video'));
+      if(!c){toast('ضيف مقطع فيديو الأول وبعدين افتح الأداة دي');return false}S.sel={k:'clip',id:c.id}}
+    S.tab=it.tab;renderTabs();renderPanel();
+    setTimeout(()=>{const e=document.getElementById(it.id);if(e){e.scrollIntoView({block:'center'});e.style.transition='background .4s';e.style.background='rgba(124,92,255,.35)';setTimeout(()=>{e.style.background=''},1600)}},60);
+    return true;
+  }
+  const btn=document.createElement('button');btn.id='ffBtn';btn.textContent='🔍';btn.title='دوّر على أي أداة';
+  btn.style.cssText='width:34px;height:34px;border-radius:50%;font-size:16px;background:#7c5cff;color:#fff;border:0;padding:0;flex:none';
+  const ov=document.createElement('div');ov.id='ffOv';ov.style.cssText='display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);align-items:flex-start;justify-content:center;padding-top:12vh';
+  ov.innerHTML='<div style="background:#1a1d29;border:1px solid #333a52;border-radius:12px;width:min(92vw,440px);padding:12px;direction:rtl"><input id="ffIn" type="text" placeholder="دوّر على أداة... (مثلا: موسيقى، ترجمة، مازج)" style="width:100%;font-size:16px"><div id="ffRes" style="margin-top:8px;max-height:50vh;overflow:auto"></div></div>';
+  {const hd=document.getElementById('top'),ex=document.getElementById('btnExport');if(hd&&ex)(document.getElementById('undo')||ex).insertAdjacentElement('beforebegin',btn);else{btn.style.cssText+=';position:fixed;left:10px;top:7px;z-index:60';document.body.appendChild(btn)}}document.body.appendChild(ov);{const st=document.createElement('style');st.textContent='@media(max-width:480px){#top .brand{font-size:0}#top .brand .logo{font-size:15px}}';document.head.appendChild(st)}
+  const show=q=>{const n=norm(q.trim()),r=document.getElementById('ffRes');
+    const hits=IDX.filter(it=>!n||norm(it.t+' '+it.k).includes(n)||n.split(/\s+/).every(w=>norm(it.t+' '+it.k).includes(w)));
+    r.innerHTML=hits.length?hits.map(it=>'<button class="btn" data-ff="'+IDX.indexOf(it)+'" style="display:block;width:100%;text-align:right;margin-bottom:6px;padding:10px">'+it.t+'</button>').join(''):'<p class="hint">مفيش نتيجة. جرّب كلمة تانية.</p>';
+    r.querySelectorAll('[data-ff]').forEach(b=>b.onclick=()=>{if(jump(IDX[+b.dataset.ff]))ov.style.display='none'})};
+  const open=()=>{ov.style.display='flex';const i=document.getElementById('ffIn');i.value='';show('');setTimeout(()=>i.focus(),50)};
+  btn.onclick=open;ov.addEventListener('click',e=>{if(e.target===ov)ov.style.display='none'});
+  document.getElementById('ffIn').addEventListener('input',e=>show(e.target.value));
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')ov.style.display='none'});
+})();
+
 /* ===== R53b: clear add-on boxes on every panel render (they used to pile up across tabs) ===== */
 (function(){
   const o=renderPanel;
