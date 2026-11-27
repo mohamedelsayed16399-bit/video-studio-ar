@@ -545,7 +545,7 @@ function panelAudio(){
   else h+=`<p class="hint">اختار مقطع صوت من الخط الزمني عشان تعدل مستواه.</p>`;
   return h;
 }
-const exp={short:IS_MOBILE?480:720,fps:30,fmt:'auto',result:null,busy:false,pct:0};
+const exp={short:IS_MOBILE?480:720,fps:30,bq:1,fmt:'auto',result:null,busy:false,pct:0};
 function bestMime(f){
   const c=f==='webm'?['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']:f==='mp4'?['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4']:['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
   return c.find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m))||'';
@@ -553,8 +553,9 @@ function bestMime(f){
 function panelExport(){
   const mp4=bestMime('mp4');
   return`<div class="fld"><label>جودة المعاينة (قلّلها لو الجهاز بطيء)</label><select data-o="pv" data-k="q">${[[360,'خفيفة 360p'],[540,'متوسطة 540p'],[720,'عالية 720p']].map(([v,n])=>`<option value="${v}" ${quality===v?'selected':''}>${n}</option>`).join('')}</select></div><div class="fld"><label>أبعاد الفيديو</label><select data-o="proj" data-k="aspect">${Object.keys(ASPECTS).map(k=>`<option value="${k}" ${S.aspect===k?'selected':''}>${k}${{'16:9':' (يوتيوب)','9:16':' (ريلز / تيك توك)','1:1':' (مربع)','4:5':' (إنستجرام)','4:3':''}[k]}</option>`).join('')}</select></div>
-  <div class="r2"><div class="fld"><label>الجودة</label><select data-o="exp" data-k="short">${[[480,'480p خفيف'],[720,'720p HD'],[1080,'1080p Full HD']].map(([v,n])=>`<option value="${v}" ${exp.short===v?'selected':''}>${n}</option>`).join('')}</select></div>
+  <div class="r2"><div class="fld"><label>الجودة</label><select data-o="exp" data-k="short">${[[480,'480p خفيف'],[720,'720p HD'],[1080,'1080p Full HD'],[1440,'1440p 2K (بيحتاج جهاز قوي)']].map(([v,n])=>`<option value="${v}" ${exp.short===v?'selected':''}>${n}</option>`).join('')}</select></div>
   <div class="fld"><label>الإطارات</label><select data-o="exp" data-k="fps">${[24,30,60].map(v=>`<option value="${v}" ${exp.fps===v?'selected':''}>${v} إطار/ث</option>`).join('')}</select></div></div>
+  <div class="fld"><label>جودة الضغط (معدل البيانات)</label><select data-o="exp" data-k="bq">${[[0.6,'صغير الحجم'],[1,'عادي'],[1.6,'عالي'],[2.4,'أقصى جودة (حجم كبير)']].map(([v,n])=>`<option value="${v}" ${exp.bq===v?'selected':''}>${n}</option>`).join('')}</select></div>
   <div class="fld"><label>الصيغة</label><select data-o="exp" data-k="fmt"><option value="auto" ${exp.fmt==='auto'?'selected':''}>تلقائي ${mp4?'(MP4)':'(WebM)'}</option><option value="webm" ${exp.fmt==='webm'?'selected':''}>WebM</option>${mp4?`<option value="mp4" ${exp.fmt==='mp4'?'selected':''}>MP4</option>`:''}</select></div>
   ${chk(S.subStyle,'burn','احرق الترجمة في الفيديو')}
   <button class="primary" id="expGo" style="width:100%" ${exp.busy?'disabled':''}>${exp.busy?'جاري التصدير...':'ابدأ التصدير'}</button>${exp.busy?'<button id="expCancel" style="width:100%;margin-top:8px;border-color:#ff5d6c;color:#ff5d6c">⏹ إلغاء التصدير</button>':''}
@@ -733,7 +734,7 @@ async function runExport(){
   exp.busy=true;exp.pct=0;exp.result=null;pause();getAC();await AC.resume();monitor.gain.value=0;
   const prevQ=quality;quality=exp.short;setCanvasSize(exp.short);
   const fps=exp.fps,stream=cv.captureStream(fps);aDest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
-  const pixels=cv.width*cv.height,vbps=Math.round(clamp(pixels*fps*0.09,1.5e6,16e6));
+  const pixels=cv.width*cv.height,vbps=Math.round(clamp(pixels*fps*0.09*(exp.bq||1),1.2e6,40e6));
   const chunks=[];let mr;try{mr=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:vbps,audioBitsPerSecond:128000})}catch(e){mr=new MediaRecorder(stream)}
   mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
   const ui=setInterval(()=>{exp.pct=Math.round(S.playhead/Math.max(.1,total)*100);const b=$('#expBar');if(b)b.style.width=exp.pct+'%';const s=$('#expSt');if(s&&exp.busy)s.textContent=`بيصدّر... ${exp.pct}%`},300);
