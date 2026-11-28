@@ -19,7 +19,7 @@
     try{const b=await detect(u);last={uid:u.id,beats:b,bpm:bpm(b)};toast(b.length?'لقيت '+b.length+' نبضة (~'+last.bpm+' BPM)':'مش لاقي إيقاع واضح في الصوت ده')}catch(e){console.error(e);toast('معرفتش أحلل الصوت ده');last=null}
     finally{busy=false;renderPanel()}
   }
-  window.__beatDetect=detect;
+  window.__beatDetect=detect;window.__beatLast=()=>last;
   window.__beatCut=function(u,every,punch){
     const b=last&&last.uid===u.id?last.beats:null;if(!b)return -1;
     const T=b.filter((x,i)=>i%every===0).map(x=>u.start+x-(u.in||0)).filter(t=>t>.3&&t<total-.3).sort((p,q)=>q-p);
